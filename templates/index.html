@@ -379,6 +379,18 @@
     .period-btn.active { background:var(--gold); color:#000; }
     .period-btn:hover:not(.active) { color:var(--ink); }
 
+    /* Sector section header */
+    .sector-header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:16px;
+    }
+    .sector-sub-label {
+      font-size:10.5px; font-weight:600; color:var(--dim);
+      letter-spacing:.07em; text-transform:uppercase;
+      margin:20px 0 10px;
+    }
+    #sectors-loading { font-size:12px; color:var(--dim); margin-bottom:16px; }
+
     /* Settings */
     #settings-modal .sheet { max-width:500px; }
     .form-group { margin-bottom:20px; }
@@ -422,6 +434,7 @@
       .movers-wrap { grid-template-columns: 1fr; }
       .market-status-strip { gap: 8px; }
       .market-badge { font-size: 11px; padding: 6px 10px; }
+      .sector-header { flex-direction: column; align-items: flex-start; gap: 10px; }
     }
   </style>
 </head>
@@ -537,6 +550,22 @@
       </div>
     </div>
 
+    <!-- Sector Performance -->
+    <div class="grid-section">
+      <div class="sector-header">
+        <div class="grid-section-label" style="margin-bottom:0">Sector Performance</div>
+        <div class="period-btns" id="sector-period-btns">
+          <button class="period-btn active" onclick="setSectorPeriod('5d',this)">1W</button>
+          <button class="period-btn" onclick="setSectorPeriod('1mo',this)">1M</button>
+          <button class="period-btn" onclick="setSectorPeriod('3mo',this)">3M</button>
+        </div>
+      </div>
+      <div id="sectors-loading"></div>
+      <div id="sectors-us"></div>
+      <div id="sectors-idx"></div>
+      <div id="sectors-crypto"></div>
+    </div>
+
   </div>
 
   <!-- ══ Daily tab ══ -->
@@ -551,7 +580,9 @@
       <h2>Sector Wraps</h2>
       <button class="archive-run-btn" id="run-monthly-btn" onclick="runMonthly()">Generate</button>
     </div>
-    <div id="monthly-heatmap" style="margin-bottom:32px"></div>
+    <div id="monthly-heatmap-us"></div>
+    <div id="monthly-heatmap-idx"></div>
+    <div id="monthly-heatmap-crypto"></div>
     <ul class="archive-list" id="monthly-list"><li class="archive-empty">No monthly wraps yet.</li></ul>
   </div>
 
@@ -888,7 +919,7 @@
     document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', TAB_NAMES[i] === name));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
-    if (name === 'markets')   { loadLive(); startPriceStream(); loadMovers(); loadMarketStatus(); }
+    if (name === 'markets')   { loadLive(); startPriceStream(); loadMovers(); loadMarketStatus(); loadSectors(); }
     if (name === 'history')   loadHistory();
     if (name === 'monthly')   loadMonthlyList();
     if (name === 'quarterly') loadQuarterlyList();
@@ -993,7 +1024,7 @@
     return `rgb(${Math.round(239-54*t)},${Math.round(68-40*t)},${Math.round(68-40*t)})`;
   }
 
-  function renderHeatmap(containerId, sectors) {
+  function renderHeatmap(containerId, sectors, title) {
     const el = document.getElementById(containerId);
     if (!sectors || !Object.keys(sectors).length) { el.innerHTML = ''; return; }
     const cells = Object.entries(sectors).map(([name, d]) => `
@@ -1001,7 +1032,37 @@
         <div class="heat-name">${name}</div>
         <div class="heat-pct">${d.return_pct > 0 ? '+' : ''}${d.return_pct.toFixed(1)}%</div>
       </div>`).join('');
-    el.innerHTML = `<div class="grid-section-label" style="margin-bottom:12px">US Sector Performance (30d)</div><div class="heatmap">${cells}</div>`;
+    const label = title ? `<div class="sector-sub-label">${title}</div>` : '';
+    el.innerHTML = `${label}<div class="heatmap">${cells}</div>`;
+  }
+
+  // ── Sector Performance (Markets tab) ──────────────────────────────────────────
+  let _sectorPeriod = '5d';
+
+  async function loadSectors(period) {
+    if (period) _sectorPeriod = period;
+    const loading = document.getElementById('sectors-loading');
+    loading.textContent = 'Loading sector data…';
+    ['sectors-us','sectors-idx','sectors-crypto'].forEach(id => document.getElementById(id).innerHTML = '');
+    try {
+      const res = await fetch('/api/sectors?p=' + _sectorPeriod);
+      if (!res.ok) throw new Error('fetch failed');
+      const d = await res.json();
+      loading.textContent = '';
+      const lblMap = {'5d':'1W','1mo':'1M','3mo':'3M'};
+      const lbl = lblMap[_sectorPeriod] || _sectorPeriod;
+      if (d.us)     renderHeatmap('sectors-us',     d.us,     `US Sectors (${lbl})`);
+      if (d.idx)    renderHeatmap('sectors-idx',    d.idx,    `IDX Sectors (${lbl})`);
+      if (d.crypto) renderHeatmap('sectors-crypto', d.crypto, `Crypto Categories (${lbl})`);
+    } catch(e) {
+      loading.textContent = 'Could not load sector data.';
+    }
+  }
+
+  function setSectorPeriod(period, btn) {
+    document.querySelectorAll('#sector-period-btns .period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadSectors(period);
   }
 
   // ── Monthly ────────────────────────────────────────────────────────────────────
@@ -1012,7 +1073,9 @@
     if (d.months && d.months.length) {
       const r2 = await fetch('/api/monthly/' + d.months[0]);
       const m  = await r2.json();
-      if (m.us_sectors) renderHeatmap('monthly-heatmap', m.us_sectors);
+      if (m.us_sectors)     renderHeatmap('monthly-heatmap-us',     m.us_sectors,     'US Sectors (30d)');
+      if (m.idx_sectors)    renderHeatmap('monthly-heatmap-idx',    m.idx_sectors,    'IDX Sectors (30d)');
+      if (m.crypto_sectors) renderHeatmap('monthly-heatmap-crypto', m.crypto_sectors, 'Crypto Categories (30d)');
     }
   }
 
@@ -1110,6 +1173,7 @@
   loadMarketStatus();
   loadLive();
   loadMovers();
+  loadSectors();
   startPriceStream();
   setInterval(loadStatus, 15000);
   setInterval(loadMarketStatus, 60000);

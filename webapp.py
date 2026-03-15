@@ -36,8 +36,9 @@ _subscribers: list = []
 _subs_lock = threading.Lock()
 
 # ── Live price cache ──────────────────────────────────────────────────────────
-_live_cache = {"data": None, "ts": 0}
-_LIVE_TTL   = 15  # seconds
+_live_cache    = {"data": None, "ts": 0}
+_LIVE_TTL      = 15   # seconds
+_SECTORS_TTL   = 300  # 5 min
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -484,6 +485,35 @@ def health():
 def market_status():
     from sources.market_status import get_market_status
     return jsonify(get_market_status())
+
+
+@app.route("/api/sectors")
+def get_sectors():
+    """Sector performance for US, IDX, and Crypto — cached 5 min per period."""
+    period = request.args.get("p", "1mo")
+    cache_key = f"sectors_{period}"
+    now = time.time()
+    cached = _live_cache.get(cache_key)
+    if cached and now - _live_cache.get(f"{cache_key}_ts", 0) < _SECTORS_TTL:
+        return jsonify(cached)
+    try:
+        from sources.sectors import get_us_sectors, get_idx_sectors, get_crypto_sectors
+        results = {}
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            fs = {
+                ex.submit(get_us_sectors,     period): "us",
+                ex.submit(get_idx_sectors,    period): "idx",
+                ex.submit(get_crypto_sectors, period): "crypto",
+            }
+            for f in as_completed(fs):
+                results[fs[f]] = f.result()
+        data = {**results, "period": period, "updated": datetime.now(WIB).strftime("%H:%M:%S WIB")}
+        _live_cache[cache_key]            = data
+        _live_cache[f"{cache_key}_ts"]    = now
+        return jsonify(data)
+    except Exception as e:
+        log.warning(f"sectors fetch failed: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/settings", methods=["POST"])

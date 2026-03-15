@@ -18,24 +18,28 @@ HIST_DIR = Path(__file__).parent / "history" / "monthly"
 
 def run_monthly_wrap() -> dict:
     """Fetch sector data, generate wrap, save, return result dict."""
-    from sources.sectors import get_us_sectors, get_idx_sectors
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from sources.sectors import get_us_sectors, get_idx_sectors, get_crypto_sectors
 
     now = datetime.now(WIB)
     month_key = now.strftime("%Y-%m")
 
-    print("📊  Fetching US sector ETFs (30d)...", end=" ", flush=True)
-    us_sectors = get_us_sectors("1mo")
-    print("✓")
-
-    print("🇮🇩  Fetching IDX sectoral indices (30d)...", end=" ", flush=True)
-    idx_sectors = get_idx_sectors("1mo")
+    print("📊  Fetching sector data in parallel...", end=" ", flush=True)
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        f_us     = ex.submit(get_us_sectors,     "1mo")
+        f_idx    = ex.submit(get_idx_sectors,    "1mo")
+        f_crypto = ex.submit(get_crypto_sectors, "1mo")
+        us_sectors     = f_us.result()
+        idx_sectors    = f_idx.result()
+        crypto_sectors = f_crypto.result()
     print("✓")
 
     data = {
-        "month":       month_key,
-        "timestamp":   now.isoformat(),
-        "us_sectors":  us_sectors,
-        "idx_sectors": idx_sectors,
+        "month":          month_key,
+        "timestamp":      now.isoformat(),
+        "us_sectors":     us_sectors,
+        "idx_sectors":    idx_sectors,
+        "crypto_sectors": crypto_sectors,
     }
 
     print("🤖  Generating monthly sector wrap...", end=" ", flush=True)
@@ -75,14 +79,15 @@ def _claude_wrap(data: dict, api_key: str) -> str:
 def _build_prompt(data: dict) -> str:
     month = data.get("month", "")
     lines = [
-        f"You are an expert equity strategist writing a monthly sector review for {month}.",
-        "Your audience: investors tracking both global and local markets.",
+        f"You are an expert multi-market strategist writing a monthly sector review for {month}.",
+        "Your audience: investors tracking US equities, Indonesian stocks, and crypto.",
         "",
         "Guidelines:",
-        "- Lead with the 1-2 standout sectors and WHY they moved",
-        "- Note rotation signals (what's rotating in/out)",
+        "- Lead with the 1-2 standout sectors across ALL THREE markets and WHY they moved",
+        "- Note rotation signals (what's rotating in/out, cross-market themes)",
         "- For IDX sectors, connect to local macro (BI rate, commodity prices, IDR, capex)",
-        "- End with a 3-bullet forward outlook: which sectors to watch next month and why",
+        "- For Crypto categories, explain what drove rotation (BTC dominance, risk-on/off, narrative shifts)",
+        "- End with a 3-bullet forward outlook covering the most important themes across all markets",
         "- Use emojis for scannability. Be specific with numbers.",
         "- Write everything in English",
         "",
@@ -97,22 +102,28 @@ def _build_prompt(data: dict) -> str:
         arrow = "▲" if d["return_pct"] >= 0 else "▼"
         lines.append(f"  {arrow} {name} ({d['ticker']}): {d['return_pct']:+.2f}%")
 
-    lines += ["", "IDX SECTORAL (sorted by return):"]
+    lines += ["", "IDX SECTORAL INDICES (sorted by return):"]
     for name, d in data.get("idx_sectors", {}).items():
         arrow = "▲" if d["return_pct"] >= 0 else "▼"
         lines.append(f"  {arrow} {name} ({d['ticker']}): {d['return_pct']:+.2f}%")
+
+    lines += ["", "CRYPTO CATEGORIES — avg return of representative tokens (sorted by return):"]
+    for name, d in data.get("crypto_sectors", {}).items():
+        arrow = "▲" if d["return_pct"] >= 0 else "▼"
+        lines.append(f"  {arrow} {name} (rep: {d['ticker']}): {d['return_pct']:+.2f}%")
 
     lines += [
         "",
         "=== END DATA ===",
         "",
         "Now write the full Monthly Sector Wrap with these sections:",
-        f"1. 📅 Monthly Recap — {month} at a glance",
-        "2. 🏆 Top Sectors — what led and why",
+        f"1. 📅 Monthly Recap — {month} at a glance (2-3 sentences, cross-market theme)",
+        "2. 🏆 Top Sectors — US & IDX leaders and why",
         "3. 📉 Laggards — what fell and why",
-        "4. 🔄 Rotation Signal — where money is moving",
+        "4. 🔄 Rotation Signal — where money is moving (risk-on/off, sector rotation)",
         "5. 🇮🇩 IDX Sector Spotlight — standout local sectors with macro context",
-        "6. 🔭 Forward Outlook — 3-bullet sector watch for next month",
+        "6. ₿ Crypto Categories — what led/lagged and the narrative driving it",
+        "7. 🔭 Forward Outlook — 3-bullet sector watch for next month (one for each market)",
     ]
     return "\n".join(lines)
 
@@ -131,14 +142,13 @@ def _template_wrap(data: dict) -> str:
     us = data.get("us_sectors", {})
     if us:
         items = list(us.items())
-        top   = [(n, d) for n, d in items if d["return_pct"] > 0]
-        bot   = [(n, d) for n, d in items if d["return_pct"] <= 0]
-
+        top = [(n, d) for n, d in items if d["return_pct"] > 0]
+        bot = [(n, d) for n, d in items if d["return_pct"] <= 0]
         lines += ["🏆 US SECTOR LEADERS:"]
         for name, d in top[:3]:
             lines.append(f"  ▲ {name}: {d['return_pct']:+.2f}%")
         lines += ["", "📉 US SECTOR LAGGARDS:"]
-        for name, d in reversed(bot[-3:]):
+        for name, d in list(reversed(bot))[:3]:
             lines.append(f"  ▼ {name}: {d['return_pct']:+.2f}%")
 
     idx = data.get("idx_sectors", {})
@@ -148,15 +158,25 @@ def _template_wrap(data: dict) -> str:
         for name, d in items[:3]:
             lines.append(f"  ▲ {name}: {d['return_pct']:+.2f}%")
         lines += ["", "📉 IDX WEAKEST SECTORS:"]
-        for name, d in reversed(items[-3:]):
+        for name, d in list(reversed(items))[:3]:
+            lines.append(f"  ▼ {name}: {d['return_pct']:+.2f}%")
+
+    crypto = data.get("crypto_sectors", {})
+    if crypto:
+        items = list(crypto.items())
+        lines += ["", "₿ CRYPTO CATEGORY LEADERS:"]
+        for name, d in items[:3]:
+            lines.append(f"  ▲ {name}: {d['return_pct']:+.2f}%")
+        lines += ["", "📉 CRYPTO CATEGORY LAGGARDS:"]
+        for name, d in list(reversed(items))[:3]:
             lines.append(f"  ▼ {name}: {d['return_pct']:+.2f}%")
 
     lines += [
         "",
         "🔭 Forward Outlook:",
-        "  • Watch for rotation from defensive to cyclical sectors if macro data improves.",
+        "  • Watch for rotation from defensive to cyclical US sectors if macro data improves.",
         "  • IDX financials may be sensitive to upcoming Bank Indonesia rate decisions.",
-        "  • Monitor global commodity prices for impact on energy and materials sectors.",
+        "  • Crypto: monitor BTC dominance — a shift lower typically signals altcoin season.",
     ]
     return "\n".join(lines)
 

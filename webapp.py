@@ -1,7 +1,7 @@
 """
 Market Briefing Web App
 Run: python webapp.py
-Then open: http://localhost:5000
+Then open: http://localhost:8080
 """
 
 import json
@@ -17,7 +17,10 @@ import pytz
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request, stream_with_context
 
+from sources.utils import get_logger
+
 load_dotenv()
+log = get_logger(__name__)
 
 app = Flask(__name__)
 WIB = pytz.timezone("Asia/Jakarta")
@@ -200,7 +203,7 @@ WATCH = {
 def _fetch_one(name, ticker, category):
     import yfinance as yf
     try:
-        hist = yf.Ticker(ticker).history(period="2d")
+        hist = yf.Ticker(ticker).history(period="2d", timeout=10)
         if len(hist) < 1:
             return None
         price = float(hist["Close"].iloc[-1])
@@ -213,12 +216,13 @@ def _fetch_one(name, ticker, category):
             "price":    round(price, 4),
             "change":   round(pct, 2),
         }
-    except Exception:
+    except Exception as e:
+        log.debug(f"WATCH {ticker}: {e}")
         return None
 
 
 def _fetch_all_prices():
-    """Fetch all tickers in parallel. Returns list of price dicts."""
+    """Fetch all WATCH tickers in parallel. Falls back to stale cache on total failure."""
     results = []
     with ThreadPoolExecutor(max_workers=6) as ex:
         futures = {ex.submit(_fetch_one, n, t, c): n for n, (t, c) in WATCH.items()}
@@ -226,7 +230,12 @@ def _fetch_all_prices():
             r = future.result()
             if r:
                 results.append(r)
-    # Preserve display order
+
+    # If we got nothing and have stale cache, return stale data
+    if not results and _live_cache["data"]:
+        log.warning("All WATCH fetches failed; serving stale cache")
+        return _live_cache["data"]["items"]
+
     order = list(WATCH.keys())
     results.sort(key=lambda x: order.index(x["name"]) if x["name"] in order else 99)
     return results
@@ -423,6 +432,46 @@ def get_settings():
         "briefing_hour": os.environ.get("BRIEFING_HOUR", "7"),
         "briefing_min":  os.environ.get("BRIEFING_MINUTE", "0"),
     })
+
+
+@app.route("/api/movers")
+def get_movers():
+    """IDX top gainers/losers — cached 2 min."""
+    now = time.time()
+    if _live_cache.get("movers") and now - _live_cache.get("movers_ts", 0) < 120:
+        return jsonify(_live_cache["movers"])
+    try:
+        from sources.stocks import get_idx_movers
+        data = get_idx_movers()
+    except Exception as e:
+        log.warning(f"movers fetch failed: {e}")
+        data = _live_cache.get("movers") or {"gainers": [], "losers": []}
+    _live_cache["movers"]    = data
+    _live_cache["movers_ts"] = now
+    return jsonify(data)
+
+
+@app.route("/api/health")
+def health():
+    """Lightweight healthcheck — returns 200 when the app is up."""
+    now = datetime.now(WIB)
+    cache_age = round(time.time() - _live_cache["ts"], 1) if _live_cache["ts"] else None
+    return jsonify({
+        "status":       "ok",
+        "time_wib":     now.strftime("%Y-%m-%d %H:%M:%S WIB"),
+        "running":      _state["running"],
+        "last_run":     _state["last_run"],
+        "last_error":   _state["last_error"],
+        "cache_age_s":  cache_age,
+        "gemini_ok":    bool(os.environ.get("GEMINI_API_KEY")),
+        "telegram_ok":  bool(os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID")),
+    })
+
+
+@app.route("/api/market-status")
+def market_status():
+    from sources.market_status import get_market_status
+    return jsonify(get_market_status())
 
 
 @app.route("/api/settings", methods=["POST"])

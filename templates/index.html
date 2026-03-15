@@ -19,6 +19,7 @@
       --gold:   #f0b429;
       --up:     #4ade80;
       --down:   #f87171;
+      --amber:  #fb923c;
       --r:      10px;
     }
 
@@ -104,7 +105,7 @@
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
     /* ── Container ── */
-    .container { max-width:960px; margin:0 auto; padding:36px 32px 80px; }
+    .container { max-width:1040px; margin:0 auto; padding:36px 32px 80px; }
 
     /* ── Tabs ── */
     .tabs {
@@ -127,10 +128,33 @@
     .tab-panel { display:none; }
     .tab-panel.active { display:block; }
 
+    /* ── Market Status Strip ── */
+    .market-status-strip {
+      display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap;
+    }
+    .market-badge {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border-radius: 8px;
+      background: var(--faint);
+      border: 1px solid var(--line);
+      font-size: 12px;
+    }
+    .market-badge-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .market-badge-dot.open   { background: var(--up); animation: pulse 2s ease-in-out infinite; }
+    .market-badge-dot.closed { background: var(--dim); }
+    .market-badge-dot.pre    { background: var(--amber); animation: pulse 2s ease-in-out infinite; }
+    .market-badge-dot.after  { background: var(--amber); }
+    .market-badge-dot.break  { background: var(--amber); }
+    .market-badge-label { font-weight: 600; color: var(--ink); }
+    .market-badge-status { color: var(--dim); margin-left: 2px; }
+    .market-badge-status.open  { color: var(--up); }
+    .market-badge-status.pre   { color: var(--amber); }
+    .market-badge-status.after { color: var(--amber); }
+
     /* ── Live update badge ── */
     .live-row {
       display:flex; align-items:center; justify-content:space-between;
-      margin-bottom:24px;
+      margin-bottom: 20px;
     }
     .live-badge {
       display:flex; align-items:center; gap:6px;
@@ -140,6 +164,9 @@
       width:5px; height:5px; border-radius:50%; background:var(--up);
       animation: pulse 2s ease-in-out infinite;
     }
+    .live-badge-dot.stale { background: var(--amber); }
+    #live-updated { font-size:11px; color:var(--dim); font-variant-numeric:tabular-nums; }
+    #live-updated.stale { color: var(--amber); }
 
     /* ── Price flash ── */
     @keyframes flashUp   { 0%{background:#052e16} 100%{background:transparent} }
@@ -150,7 +177,7 @@
     /* ── Price grid ── */
     .price-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 1px;
       background: var(--line);
       border-radius: var(--r);
@@ -159,25 +186,21 @@
     }
     .price-card {
       background: var(--bg);
-      padding: 18px 20px;
+      padding: 16px 18px;
       cursor: pointer;
       transition: background .15s;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+      display: flex; flex-direction: column; gap: 6px;
     }
     .price-card:hover { background: #111; }
     .price-card-label {
-      font-size: 11px; font-weight:600;
+      font-size: 10.5px; font-weight:600;
       color: var(--dim);
-      letter-spacing: .04em;
-      text-transform: uppercase;
+      letter-spacing: .04em; text-transform: uppercase;
     }
     .price-card-value {
-      font-size: 20px; font-weight: 600;
+      font-size: 19px; font-weight: 600;
       font-variant-numeric: tabular-nums;
-      letter-spacing: -.02em;
-      line-height: 1;
+      letter-spacing: -.02em; line-height: 1;
     }
     .price-card-change {
       font-size: 12px; font-weight: 500;
@@ -190,10 +213,42 @@
     /* Grid section labels */
     .grid-section-label {
       font-size: 10.5px; font-weight:600; letter-spacing:.08em;
-      text-transform: uppercase; color:var(--dim);
-      margin-bottom: 12px;
+      text-transform: uppercase; color:var(--dim); margin-bottom: 12px;
     }
     .grid-section { margin-bottom: 32px; }
+
+    /* ── Movers table ── */
+    .movers-wrap {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+      margin-bottom: 40px;
+    }
+    .movers-panel {
+      background: var(--faint);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .movers-head {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 10.5px; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: var(--dim);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .movers-head-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .movers-table { width:100%; border-collapse:collapse; }
+    .movers-table td {
+      padding: 9px 16px;
+      font-size: 12.5px;
+      border-bottom: 1px solid var(--line);
+      font-variant-numeric: tabular-nums;
+    }
+    .movers-table tr:last-child td { border-bottom: none; }
+    .movers-table .ticker-col { font-weight: 600; color: var(--ink); }
+    .movers-table .price-col  { color: var(--dim); }
+    .movers-table .pct-col    { text-align: right; font-weight: 600; }
+    .movers-empty { padding: 20px 16px; font-size:12px; color:var(--dim); }
 
     /* ── Progress ── */
     #progress-section { margin-bottom:32px; display:none; }
@@ -244,25 +299,22 @@
     /* ── Sector heatmap ── */
     .heatmap {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
       gap: 3px;
       margin-bottom: 36px;
     }
     .heat-cell {
-      padding: 14px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: opacity .15s;
-      min-height: 70px;
+      padding: 12px; border-radius: 6px; cursor: pointer;
+      transition: opacity .15s; min-height: 64px;
       display: flex; flex-direction: column; justify-content: space-between;
     }
     .heat-cell:hover { opacity: .8; }
-    .heat-name { font-size: 11px; font-weight:600; color: rgba(0,0,0,.8); }
-    .heat-pct  { font-size: 16px; font-weight:700; color: rgba(0,0,0,.85); }
+    .heat-name { font-size: 10.5px; font-weight:600; color: rgba(0,0,0,.8); }
+    .heat-pct  { font-size: 15px; font-weight:700; color: rgba(0,0,0,.85); }
 
     /* ── Chart sheet ── */
     #chart-sheet .sheet { max-width: 900px; }
-    #chart-container { height: 400px; width: 100%; }
+    #chart-container { height: 380px; width: 100%; }
 
     /* ── Sheets / modals ── */
     .modal-overlay {
@@ -321,8 +373,7 @@
     .period-btn {
       height:26px; padding:0 10px;
       background:var(--faint); color:var(--dim);
-      border:none; border-radius:6px;
-      font-size:11px; font-weight:600;
+      border:none; border-radius:6px; font-size:11px; font-weight:600;
       cursor:pointer; transition:all .15s;
     }
     .period-btn.active { background:var(--gold); color:#000; }
@@ -356,7 +407,7 @@
       transition: all .25s cubic-bezier(.22,1,.36,1);
       z-index:400; pointer-events:none;
     }
-    #toast.show  { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.show    { opacity:1; transform:translateX(-50%) translateY(0); }
     #toast.success { border-color:var(--up);   color:var(--up); }
     #toast.error   { border-color:var(--down); color:var(--down); }
 
@@ -364,10 +415,13 @@
     ::-webkit-scrollbar-track { background:transparent; }
     ::-webkit-scrollbar-thumb { background:var(--faint); border-radius:2px; }
 
-    @media (max-width:600px) {
+    @media (max-width:700px) {
       header, .meta-bar, .container { padding-left:16px; padding-right:16px; }
       .status-dots .dot-item span { display:none; }
       .price-grid { grid-template-columns: repeat(2, 1fr); }
+      .movers-wrap { grid-template-columns: 1fr; }
+      .market-status-strip { gap: 8px; }
+      .market-badge { font-size: 11px; padding: 6px 10px; }
     }
   </style>
 </head>
@@ -418,34 +472,80 @@
     <button class="tab-btn" onclick="switchTab('history')">Archive</button>
   </div>
 
-  <!-- Markets tab -->
+  <!-- ══ Markets tab ══ -->
   <div id="tab-markets" class="tab-panel active">
-    <div class="live-row">
-      <div class="live-badge"><div class="live-badge-dot"></div> Live</div>
-      <span id="live-updated" style="font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums"></span>
+
+    <!-- Market status strip -->
+    <div class="market-status-strip" id="market-status-strip">
+      <div class="market-badge" id="badge-us">
+        <div class="market-badge-dot closed" id="dot-us"></div>
+        <span class="market-badge-label">NYSE</span>
+        <span class="market-badge-status" id="label-us">—</span>
+      </div>
+      <div class="market-badge" id="badge-idx">
+        <div class="market-badge-dot closed" id="dot-idx"></div>
+        <span class="market-badge-label">IDX</span>
+        <span class="market-badge-status" id="label-idx">—</span>
+      </div>
     </div>
 
+    <!-- Live badge + timestamp -->
+    <div class="live-row">
+      <div class="live-badge">
+        <div class="live-badge-dot" id="live-dot"></div>
+        Live
+      </div>
+      <span id="live-updated"></span>
+    </div>
+
+    <!-- Indices -->
     <div class="grid-section">
       <div class="grid-section-label">Indices</div>
       <div class="price-grid" id="grid-index"></div>
     </div>
+
+    <!-- Crypto -->
     <div class="grid-section">
       <div class="grid-section-label">Crypto</div>
       <div class="price-grid" id="grid-crypto"></div>
     </div>
+
+    <!-- Commodities & Forex -->
     <div class="grid-section">
       <div class="grid-section-label">Commodities &amp; Forex</div>
       <div class="price-grid" id="grid-other"></div>
     </div>
+
+    <!-- IDX Movers -->
+    <div class="grid-section">
+      <div class="grid-section-label">IDX Top Movers</div>
+      <div class="movers-wrap">
+        <div class="movers-panel">
+          <div class="movers-head">
+            <div class="movers-head-dot" style="background:var(--up)"></div>
+            Top Gainers
+          </div>
+          <div id="movers-gainers"><p class="movers-empty">Loading…</p></div>
+        </div>
+        <div class="movers-panel">
+          <div class="movers-head">
+            <div class="movers-head-dot" style="background:var(--down)"></div>
+            Top Losers
+          </div>
+          <div id="movers-losers"><p class="movers-empty">Loading…</p></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Daily tab -->
+  <!-- ══ Daily tab ══ -->
   <div id="tab-latest" class="tab-panel">
     <div id="briefing-ts"></div>
     <div id="briefing-content"><span class="placeholder">Hit Run Now to generate today's market briefing.</span></div>
   </div>
 
-  <!-- Monthly tab -->
+  <!-- ══ Monthly tab ══ -->
   <div id="tab-monthly" class="tab-panel">
     <div class="archive-header">
       <h2>Sector Wraps</h2>
@@ -455,7 +555,7 @@
     <ul class="archive-list" id="monthly-list"><li class="archive-empty">No monthly wraps yet.</li></ul>
   </div>
 
-  <!-- Quarterly tab -->
+  <!-- ══ Quarterly tab ══ -->
   <div id="tab-quarterly" class="tab-panel">
     <div class="archive-header">
       <h2>Macro Theses</h2>
@@ -464,7 +564,7 @@
     <ul class="archive-list" id="quarterly-list"><li class="archive-empty">No quarterly theses yet.</li></ul>
   </div>
 
-  <!-- Archive tab -->
+  <!-- ══ Archive tab ══ -->
   <div id="tab-history" class="tab-panel">
     <div class="archive-header"><h2>Daily Archive</h2></div>
     <ul class="archive-list" id="history-list"><li class="archive-empty">No archive yet.</li></ul>
@@ -557,10 +657,11 @@
 <div id="toast"></div>
 
 <script>
-  let eventSource = null;
+  let eventSource  = null;
   let _chart = null, _candleSeries = null, _chartTicker = '', _chartPeriod = '5d';
+  let _lastUpdateTs = 0;
 
-  // ── Loader ────────────────────────────────────────────────────────────────────
+  // ── Loader ──────────────────────────────────────────────────────────────────
   function loaderStart() {
     const el = document.getElementById('loader');
     el.style.transition = 'width 8s cubic-bezier(.1,1,.1,1)';
@@ -575,29 +676,72 @@
     setTimeout(() => { el.style.width = '0%'; el.style.transition = 'none'; }, 700);
   }
 
-  // ── Status ────────────────────────────────────────────────────────────────────
+  // ── Status ──────────────────────────────────────────────────────────────────
   async function loadStatus() {
-    const res = await fetch('/api/status');
-    const d   = await res.json();
-    document.getElementById('last-run').textContent = d.last_run || 'never';
-    document.getElementById('next-run').textContent = d.next_run || '—';
-    const pulse = document.getElementById('status-pulse');
-    const stxt  = document.getElementById('status-text');
-    if (d.running) { pulse.classList.add('running'); stxt.textContent = 'Running'; }
-    else {
-      pulse.classList.remove('running');
-      stxt.textContent = d.last_error ? 'Error' : 'Idle';
-      pulse.style.background = d.last_error ? 'var(--down)' : 'var(--up)';
-    }
-    document.getElementById('dot-gemini').className   = 'dot ' + (d.gemini_ok   ? 'on' : 'off');
-    document.getElementById('dot-telegram').className = 'dot ' + (d.telegram_ok ? 'on' : 'off');
-    if (d.has_briefing && d.briefing) {
-      document.getElementById('briefing-content').textContent = d.briefing;
-      document.getElementById('briefing-ts').textContent = (d.last_run || '').toUpperCase();
-    }
+    try {
+      const res = await fetch('/api/status');
+      const d   = await res.json();
+      document.getElementById('last-run').textContent = d.last_run || 'never';
+      document.getElementById('next-run').textContent = d.next_run || '—';
+      const pulse = document.getElementById('status-pulse');
+      const stxt  = document.getElementById('status-text');
+      if (d.running) { pulse.classList.add('running'); stxt.textContent = 'Running'; }
+      else {
+        pulse.classList.remove('running');
+        stxt.textContent = d.last_error ? 'Error' : 'Idle';
+        pulse.style.background = d.last_error ? 'var(--down)' : 'var(--up)';
+      }
+      document.getElementById('dot-gemini').className   = 'dot ' + (d.gemini_ok   ? 'on' : 'off');
+      document.getElementById('dot-telegram').className = 'dot ' + (d.telegram_ok ? 'on' : 'off');
+      if (d.has_briefing && d.briefing) {
+        document.getElementById('briefing-content').textContent = d.briefing;
+        document.getElementById('briefing-ts').textContent = (d.last_run || '').toUpperCase();
+      }
+    } catch(e) { /* silent */ }
   }
 
-  // ── Live prices ───────────────────────────────────────────────────────────────
+  // ── Market Status ────────────────────────────────────────────────────────────
+  async function loadMarketStatus() {
+    try {
+      const res = await fetch('/api/market-status');
+      const d   = await res.json();
+      renderMarketBadge('us',  d.us);
+      renderMarketBadge('idx', d.idx);
+    } catch(e) { /* silent */ }
+  }
+
+  function renderMarketBadge(id, s) {
+    const dot   = document.getElementById('dot-' + id);
+    const label = document.getElementById('label-' + id);
+    if (!dot || !label) return;
+    dot.className   = 'market-badge-dot ' + s.status;
+    label.className = 'market-badge-status ' + s.status;
+    label.textContent = s.label;
+  }
+
+  // ── Movers ────────────────────────────────────────────────────────────────
+  async function loadMovers() {
+    try {
+      const res = await fetch('/api/movers');
+      const d   = await res.json();
+      renderMoversTable('movers-gainers', d.gainers || [], 'up');
+      renderMoversTable('movers-losers',  d.losers  || [], 'down');
+    } catch(e) { /* silent */ }
+  }
+
+  function renderMoversTable(id, rows, cls) {
+    const el = document.getElementById(id);
+    if (!rows.length) { el.innerHTML = '<p class="movers-empty">No data</p>'; return; }
+    const html = `<table class="movers-table">` +
+      rows.map(r => `<tr>
+        <td class="ticker-col">${r.ticker}</td>
+        <td class="price-col">Rp${r.price.toLocaleString()}</td>
+        <td class="pct-col ${cls}">${r.change_pct > 0 ? '+' : ''}${r.change_pct.toFixed(2)}%</td>
+      </tr>`).join('') + `</table>`;
+    el.innerHTML = html;
+  }
+
+  // ── Live prices ──────────────────────────────────────────────────────────────
   const CATEGORY_GRIDS = { index:'grid-index', crypto:'grid-crypto', commodity:'grid-other', forex:'grid-other' };
   let _priceStream = null;
 
@@ -609,7 +753,12 @@
   }
 
   function renderPrices(d) {
-    document.getElementById('live-updated').textContent = d.updated;
+    _lastUpdateTs = Date.now();
+    const updEl  = document.getElementById('live-updated');
+    const dotEl  = document.getElementById('live-dot');
+    updEl.textContent = d.updated;
+    updEl.classList.remove('stale');
+    dotEl.classList.remove('stale');
 
     d.items.forEach(item => {
       const id   = 'card-' + item.ticker.replace(/[^a-zA-Z0-9]/g, '_');
@@ -619,9 +768,7 @@
       const changeStr = `${sign}${item.change.toFixed(2)}%`;
 
       let card = document.getElementById(id);
-
       if (!card) {
-        // First render — create card in the right grid
         const gridId = CATEGORY_GRIDS[item.category] || 'grid-other';
         const grid   = document.getElementById(gridId);
         if (!grid) return;
@@ -632,28 +779,30 @@
         card.innerHTML = `
           <div class="price-card-label">${item.name}</div>
           <div class="price-card-value" id="${id}-v">${priceStr}</div>
-          <div class="price-card-change ${cls}" id="${id}-c">${changeStr}</div>
-        `;
+          <div class="price-card-change ${cls}" id="${id}-c">${changeStr}</div>`;
         grid.appendChild(card);
       } else {
-        // Update existing card — only touch what changed
         const vEl = document.getElementById(id + '-v');
         const cEl = document.getElementById(id + '-c');
         if (vEl && vEl.textContent !== priceStr) {
           vEl.textContent = priceStr;
-          // Flash animation
           card.classList.remove('flash-up', 'flash-down');
-          void card.offsetWidth; // reflow to restart animation
+          void card.offsetWidth;
           if (item.up)   card.classList.add('flash-up');
           if (item.down) card.classList.add('flash-down');
         }
-        if (cEl) {
-          cEl.textContent = changeStr;
-          cEl.className   = `price-card-change ${cls}`;
-        }
+        if (cEl) { cEl.textContent = changeStr; cEl.className = `price-card-change ${cls}`; }
       }
     });
   }
+
+  // Mark data stale if no update in 45s
+  setInterval(() => {
+    if (_lastUpdateTs && Date.now() - _lastUpdateTs > 45000) {
+      document.getElementById('live-updated').classList.add('stale');
+      document.getElementById('live-dot').classList.add('stale');
+    }
+  }, 5000);
 
   async function loadLive() {
     try {
@@ -670,20 +819,17 @@
       try { renderPrices(JSON.parse(e.data)); } catch(_) {}
     };
     _priceStream.onerror = () => {
-      // Reconnect after 5s on error
       _priceStream.close();
       setTimeout(startPriceStream, 5000);
     };
   }
 
-  // ── Chart ─────────────────────────────────────────────────────────────────────
+  // ── Chart ────────────────────────────────────────────────────────────────────
   async function openChart(ticker, name) {
     _chartTicker = ticker;
     document.getElementById('chart-title').textContent = name;
     document.getElementById('chart-price').textContent = '';
     document.getElementById('chart-sheet').classList.add('visible');
-
-    // Reset period buttons
     document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('.period-btn').classList.add('active');
     _chartPeriod = '5d';
@@ -692,29 +838,20 @@
 
   async function loadChartData() {
     const container = document.getElementById('chart-container');
-
-    // Destroy existing chart
     if (_chart) { _chart.remove(); _chart = null; _candleSeries = null; }
-
     _chart = LightweightCharts.createChart(container, {
-      width:  container.clientWidth,
-      height: 380,
+      width:  container.clientWidth, height: 380,
       layout: { background: { color: '#111111' }, textColor: '#a1a1aa' },
       grid:   { vertLines: { color: '#18181b' }, horzLines: { color: '#18181b' } },
       crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
       rightPriceScale: { borderColor: '#27272a' },
       timeScale: { borderColor: '#27272a', timeVisible: true },
     });
-
     _candleSeries = _chart.addCandlestickSeries({
-      upColor:          '#4ade80',
-      downColor:        '#f87171',
-      borderUpColor:    '#4ade80',
-      borderDownColor:  '#f87171',
-      wickUpColor:      '#4ade80',
-      wickDownColor:    '#f87171',
+      upColor:'#4ade80', downColor:'#f87171',
+      borderUpColor:'#4ade80', borderDownColor:'#f87171',
+      wickUpColor:'#4ade80', wickDownColor:'#f87171',
     });
-
     try {
       const res  = await fetch(`/api/chart-data/${_chartTicker}?p=${_chartPeriod}`);
       const data = await res.json();
@@ -725,11 +862,7 @@
         document.getElementById('chart-price').textContent = `Close ${last.close.toLocaleString()}`;
       }
     } catch(e) { /* silent */ }
-
-    // Responsive resize
-    const ro = new ResizeObserver(() => {
-      if (_chart) _chart.applyOptions({ width: container.clientWidth });
-    });
+    const ro = new ResizeObserver(() => { if (_chart) _chart.applyOptions({ width: container.clientWidth }); });
     ro.observe(container);
   }
 
@@ -745,13 +878,13 @@
     if (_chart) { _chart.remove(); _chart = null; }
   }
 
-  // ── Tabs ──────────────────────────────────────────────────────────────────────
+  // ── Tabs ─────────────────────────────────────────────────────────────────────
   const TAB_NAMES = ['markets','latest','monthly','quarterly','history'];
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', TAB_NAMES[i] === name));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
-    if (name === 'markets')   { loadLive(); startPriceStream(); }
+    if (name === 'markets')   { loadLive(); startPriceStream(); loadMovers(); loadMarketStatus(); }
     if (name === 'history')   loadHistory();
     if (name === 'monthly')   loadMonthlyList();
     if (name === 'quarterly') loadQuarterlyList();
@@ -799,7 +932,7 @@
         document.getElementById('briefing-content').textContent = text;
         document.getElementById('briefing-ts').textContent = new Date().toLocaleString('en-US',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).toUpperCase();
       },
-      () => toast('Briefing ready', 'success'),
+      () => { toast('Briefing ready', 'success'); loadMovers(); },
       () => {
         btn.disabled = false;
         btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="1,1 9,5 1,9"/></svg> Run Now';
@@ -844,8 +977,6 @@
     document.getElementById('hist-ts-label').textContent   = r.timestamp ? new Date(r.timestamp).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) + ' WIB' : '';
     document.getElementById('hist-content').textContent    = r.briefing || '';
     document.getElementById('hist-record-count').textContent = _histRecords.length > 1 ? `${_histIdx+1} / ${_histRecords.length}` : '';
-    document.getElementById('hist-prev').style.display = '';
-    document.getElementById('hist-next').style.display = '';
     document.getElementById('hist-prev').disabled = _histIdx <= 0;
     document.getElementById('hist-next').disabled = _histIdx >= _histRecords.length - 1;
   }
@@ -853,40 +984,27 @@
 
   // ── Heatmap ───────────────────────────────────────────────────────────────────
   function heatColor(pct) {
-    const abs = Math.min(Math.abs(pct), 8);
-    const t   = abs / 8;
-    if (pct >= 0) {
-      const r = Math.round(22  + (74  - 22)  * t);
-      const g = Math.round(163 + (222 - 163) * t);
-      const b = Math.round(74  + (128 - 74)  * t);
-      return `rgb(${r},${g},${b})`;
-    } else {
-      const r = Math.round(239 + (185 - 239) * t);
-      const g = Math.round(68  + (28  - 68)  * t);
-      const b = Math.round(68  + (28  - 68)  * t);
-      return `rgb(${r},${g},${b})`;
-    }
+    const abs = Math.min(Math.abs(pct), 8), t = abs / 8;
+    if (pct >= 0) return `rgb(${Math.round(22+52*t)},${Math.round(163+59*t)},${Math.round(74+54*t)})`;
+    return `rgb(${Math.round(239-54*t)},${Math.round(68-40*t)},${Math.round(68-40*t)})`;
   }
 
   function renderHeatmap(containerId, sectors) {
     const el = document.getElementById(containerId);
     if (!sectors || !Object.keys(sectors).length) { el.innerHTML = ''; return; }
-    const cells = Object.entries(sectors).map(([name, d]) => {
-      const bg = heatColor(d.return_pct);
-      return `<div class="heat-cell" style="background:${bg}" onclick="openChart('${d.ticker}','${name}')">
+    const cells = Object.entries(sectors).map(([name, d]) => `
+      <div class="heat-cell" style="background:${heatColor(d.return_pct)}" onclick="openChart('${d.ticker}','${name}')">
         <div class="heat-name">${name}</div>
         <div class="heat-pct">${d.return_pct > 0 ? '+' : ''}${d.return_pct.toFixed(1)}%</div>
-      </div>`;
-    }).join('');
+      </div>`).join('');
     el.innerHTML = `<div class="grid-section-label" style="margin-bottom:12px">US Sector Performance (30d)</div><div class="heatmap">${cells}</div>`;
   }
 
-  // ── Monthly ───────────────────────────────────────────────────────────────────
+  // ── Monthly ────────────────────────────────────────────────────────────────────
   async function loadMonthlyList() {
     const res = await fetch('/api/monthly');
     const d   = await res.json();
     renderArchive('monthly-list', d.months, m => m, () => 'Sector rotation wrap', m => `openTextModal('/api/monthly/${m}','wrap','${m} — Sector Wrap')`);
-    // Show heatmap from most recent month
     if (d.months && d.months.length) {
       const r2 = await fetch('/api/monthly/' + d.months[0]);
       const m  = await r2.json();
@@ -903,13 +1021,13 @@
     const res = await fetch('/api/monthly/run', { method: 'POST' });
     if (!res.ok) { toast('Already running','error'); btn.disabled=false; btn.textContent='Generate'; loaderDone(); return; }
     attachStream(
-      (text) => openSheet('Monthly Sector Wrap', new Date().toLocaleDateString(), text, false),
+      (text) => openSheet('Monthly Sector Wrap', new Date().toLocaleDateString(), text),
       () => { toast('Monthly wrap ready','success'); loadMonthlyList(); },
       () => { btn.disabled=false; btn.textContent='Generate'; }
     );
   }
 
-  // ── Quarterly ─────────────────────────────────────────────────────────────────
+  // ── Quarterly ──────────────────────────────────────────────────────────────────
   async function loadQuarterlyList() {
     const res = await fetch('/api/quarterly');
     const d   = await res.json();
@@ -925,7 +1043,7 @@
     const res = await fetch('/api/quarterly/run', { method: 'POST' });
     if (!res.ok) { toast('Already running','error'); btn.disabled=false; btn.textContent='Generate'; loaderDone(); return; }
     attachStream(
-      (text) => openSheet('Quarterly Macro Thesis', new Date().toLocaleDateString(), text, false),
+      (text) => openSheet('Quarterly Macro Thesis', new Date().toLocaleDateString(), text),
       () => { toast('Quarterly thesis ready','success'); loadQuarterlyList(); },
       () => { btn.disabled=false; btn.textContent='Generate'; }
     );
@@ -933,11 +1051,11 @@
 
   // ── Shared sheet opener ───────────────────────────────────────────────────────
   function openSheet(title, ts, content) {
-    document.getElementById('hist-date-label').textContent = title;
-    document.getElementById('hist-ts-label').textContent   = ts;
-    document.getElementById('hist-content').textContent    = content;
-    document.getElementById('hist-prev').style.display     = 'none';
-    document.getElementById('hist-next').style.display     = 'none';
+    document.getElementById('hist-date-label').textContent  = title;
+    document.getElementById('hist-ts-label').textContent    = ts;
+    document.getElementById('hist-content').textContent     = content;
+    document.getElementById('hist-prev').style.display      = 'none';
+    document.getElementById('hist-next').style.display      = 'none';
     document.getElementById('hist-record-count').textContent = '';
     document.getElementById('hist-modal').classList.add('visible');
   }
@@ -981,9 +1099,13 @@
 
   // ── Init ──────────────────────────────────────────────────────────────────────
   loadStatus();
-  loadLive();          // immediate snapshot on page load
-  startPriceStream();  // then SSE for live updates
-  setInterval(loadStatus, 10000);
+  loadMarketStatus();
+  loadLive();
+  loadMovers();
+  startPriceStream();
+  setInterval(loadStatus, 15000);
+  setInterval(loadMarketStatus, 60000);
+  setInterval(loadMovers, 120000);
 </script>
 </body>
 </html>

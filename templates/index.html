@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Briefing</title>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:     #0a0a0a;
+      --ink:    #fafafa;
+      --dim:    #a1a1aa;
+      --faint:  #27272a;
+      --line:   #18181b;
+      --gold:   #f0b429;
+      --up:     #4ade80;
+      --down:   #f87171;
+      --r:      10px;
+    }
+
+    html { font-size: 15px; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Loader ── */
+    #loader {
+      position: fixed; top: 0; left: 0;
+      height: 2px; width: 0%;
+      background: var(--gold);
+      transition: width .3s ease;
+      z-index: 999;
+      border-radius: 0 2px 2px 0;
+    }
+    #loader.done { width:100%; opacity:0; transition: opacity .4s ease .2s; }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--line);
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky; top: 0;
+      background: var(--bg);
+      z-index: 100;
+    }
+    .wordmark {
+      font-size: 14px; font-weight: 600; letter-spacing: .04em;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .wordmark-dot { width:7px; height:7px; border-radius:50%; background:var(--gold); }
+    .header-right { display:flex; align-items:center; gap:18px; }
+    .status-dots  { display:flex; align-items:center; gap:12px; }
+    .dot-item {
+      display:flex; align-items:center; gap:5px;
+      font-size:11px; color:var(--dim); letter-spacing:.02em;
+    }
+    .dot { width:6px; height:6px; border-radius:50%; background:var(--faint); }
+    .dot.on  { background: var(--up); }
+    .dot.off { background: var(--down); }
+    .icon-btn {
+      background:none; border:none; color:var(--dim); cursor:pointer;
+      padding:6px; border-radius:6px; font-size:16px;
+      transition: color .15s, background .15s;
+      display:flex; align-items:center;
+    }
+    .icon-btn:hover { color:var(--ink); background:var(--faint); }
+    #run-btn {
+      height:32px; padding:0 16px;
+      background:var(--gold); color:#000;
+      border:none; border-radius:var(--r);
+      font-size:12px; font-weight:700;
+      letter-spacing:.05em; text-transform:uppercase;
+      cursor:pointer;
+      transition: opacity .15s, transform .1s;
+      display:flex; align-items:center; gap:6px;
+    }
+    #run-btn:hover   { opacity:.88; }
+    #run-btn:active  { transform: scale(.97); }
+    #run-btn:disabled { opacity:.35; cursor:not-allowed; transform:none; }
+
+    /* ── Meta bar ── */
+    .meta-bar {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 32px;
+      display: flex; align-items: center; gap: 24px;
+      font-size: 11.5px; color: var(--dim);
+    }
+    .meta-bar strong { color:var(--ink); font-weight:500; }
+    .meta-sep { opacity:.3; }
+    #status-pill { margin-left:auto; display:flex; align-items:center; gap:5px; font-size:11px; }
+    #status-pulse { width:6px; height:6px; border-radius:50%; background:var(--up); }
+    #status-pulse.running { background:var(--gold); animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Container ── */
+    .container { max-width:960px; margin:0 auto; padding:36px 32px 80px; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display:flex; gap:0;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 36px;
+    }
+    .tab-btn {
+      background:none; border:none;
+      border-bottom: 2px solid transparent;
+      margin-bottom:-1px;
+      padding: 0 20px 12px;
+      font-size:13px; font-weight:500;
+      color:var(--dim); cursor:pointer;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn:first-child { padding-left:0; }
+    .tab-btn:hover  { color:var(--ink); }
+    .tab-btn.active { color:var(--ink); border-bottom-color:var(--gold); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    /* ── Live update badge ── */
+    .live-row {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:24px;
+    }
+    .live-badge {
+      display:flex; align-items:center; gap:6px;
+      font-size:11px; color:var(--dim);
+    }
+    .live-badge-dot {
+      width:5px; height:5px; border-radius:50%; background:var(--up);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* ── Price flash ── */
+    @keyframes flashUp   { 0%{background:#052e16} 100%{background:transparent} }
+    @keyframes flashDown { 0%{background:#2d0a0a} 100%{background:transparent} }
+    .price-card.flash-up   { animation: flashUp   .8s ease forwards; }
+    .price-card.flash-down { animation: flashDown .8s ease forwards; }
+
+    /* ── Price grid ── */
+    .price-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+      margin-bottom: 40px;
+    }
+    .price-card {
+      background: var(--bg);
+      padding: 18px 20px;
+      cursor: pointer;
+      transition: background .15s;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .price-card:hover { background: #111; }
+    .price-card-label {
+      font-size: 11px; font-weight:600;
+      color: var(--dim);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .price-card-value {
+      font-size: 20px; font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -.02em;
+      line-height: 1;
+    }
+    .price-card-change {
+      font-size: 12px; font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+    .up   { color: var(--up); }
+    .down { color: var(--down); }
+    .flat { color: var(--dim); }
+
+    /* Grid section labels */
+    .grid-section-label {
+      font-size: 10.5px; font-weight:600; letter-spacing:.08em;
+      text-transform: uppercase; color:var(--dim);
+      margin-bottom: 12px;
+    }
+    .grid-section { margin-bottom: 32px; }
+
+    /* ── Progress ── */
+    #progress-section { margin-bottom:32px; display:none; }
+    #progress-section.visible { display:block; }
+    #progress-log { list-style:none; display:flex; flex-direction:column; gap:6px; }
+    #progress-log li {
+      font-size:12px; color:var(--dim);
+      display:flex; align-items:center; gap:10px;
+      animation: fadeUp .25s ease both;
+    }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+    #progress-log li::before { content:''; width:4px; height:4px; border-radius:50%; background:var(--gold); flex-shrink:0; }
+
+    /* ── Briefing ── */
+    #briefing-ts { font-size:11px; color:var(--dim); letter-spacing:.03em; margin-bottom:24px; text-transform:uppercase; }
+    #briefing-content {
+      font-family: 'JetBrains Mono', monospace;
+      font-size:13px; line-height:1.85; white-space:pre-wrap; color:var(--ink); min-height:160px;
+    }
+    #briefing-content .placeholder { color:var(--dim); font-family:'Inter',sans-serif; font-size:14px; }
+
+    /* ── Archive ── */
+    .archive-header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:28px; }
+    .archive-header h2 { font-size:13px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+    .archive-run-btn {
+      height:28px; padding:0 14px;
+      background:var(--faint); color:var(--ink);
+      border:none; border-radius:6px;
+      font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+      cursor:pointer; transition: background .15s, color .15s;
+    }
+    .archive-run-btn:hover { background:var(--gold); color:#000; }
+    .archive-run-btn:disabled { opacity:.4; cursor:not-allowed; }
+    .archive-list { list-style:none; }
+    .archive-item {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px 0; border-bottom:1px solid var(--line);
+      cursor:pointer; transition: padding-left .15s;
+    }
+    .archive-item:first-child { border-top:1px solid var(--line); }
+    .archive-item:hover { padding-left:8px; }
+    .archive-item:hover .archive-arrow { opacity:1; }
+    .archive-date { font-size:17px; font-weight:500; letter-spacing:-.01em; }
+    .archive-sub  { font-size:11px; color:var(--dim); margin-top:2px; }
+    .archive-arrow { font-size:13px; color:var(--dim); opacity:0; transition:opacity .15s; }
+    .archive-empty { padding:60px 0; text-align:center; color:var(--dim); font-size:13px; }
+
+    /* ── Sector heatmap ── */
+    .heatmap {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 3px;
+      margin-bottom: 36px;
+    }
+    .heat-cell {
+      padding: 14px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: opacity .15s;
+      min-height: 70px;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .heat-cell:hover { opacity: .8; }
+    .heat-name { font-size: 11px; font-weight:600; color: rgba(0,0,0,.8); }
+    .heat-pct  { font-size: 16px; font-weight:700; color: rgba(0,0,0,.85); }
+
+    /* ── Chart sheet ── */
+    #chart-sheet .sheet { max-width: 900px; }
+    #chart-container { height: 400px; width: 100%; }
+
+    /* ── Sheets / modals ── */
+    .modal-overlay {
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.8);
+      backdrop-filter: blur(4px);
+      display:none; align-items:flex-end; justify-content:center;
+      z-index:200; padding:0;
+    }
+    .modal-overlay.visible { display:flex; }
+    .sheet {
+      background:#111111;
+      border:1px solid var(--line); border-bottom:none;
+      border-radius:16px 16px 0 0;
+      width:100%; max-width:800px; max-height:90vh;
+      display:flex; flex-direction:column;
+      animation: slideUp .3s cubic-bezier(.22,1,.36,1);
+    }
+    @keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:none;opacity:1} }
+    .sheet-handle { width:36px; height:4px; background:var(--faint); border-radius:2px; margin:12px auto 0; flex-shrink:0; }
+    .sheet-head {
+      padding:20px 28px 16px; border-bottom:1px solid var(--line);
+      display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+    }
+    .sheet-title { font-size:15px; font-weight:600; }
+    .sheet-meta  { font-size:11px; color:var(--dim); }
+    .sheet-nav   { display:flex; align-items:center; gap:4px; }
+    .nav-btn {
+      width:28px; height:28px; background:var(--faint); border:none; border-radius:6px;
+      color:var(--ink); font-size:12px; cursor:pointer;
+      transition:background .15s; display:flex; align-items:center; justify-content:center;
+    }
+    .nav-btn:hover { background:#3f3f46; }
+    .nav-btn:disabled { opacity:.3; cursor:default; }
+    .nav-count { font-size:11px; color:var(--dim); padding:0 6px; }
+    .sheet-body { flex:1; overflow-y:auto; padding:28px; }
+    #hist-content {
+      font-family:'JetBrains Mono',monospace;
+      font-size:12.5px; line-height:1.8; white-space:pre-wrap; color:var(--ink);
+    }
+    .sheet-foot {
+      padding:16px 28px; border-top:1px solid var(--line);
+      display:flex; justify-content:flex-end; gap:10px; flex-shrink:0;
+    }
+    .close-btn {
+      height:32px; padding:0 18px;
+      background:var(--faint); color:var(--ink);
+      border:none; border-radius:8px;
+      font-size:12px; font-weight:600; letter-spacing:.04em;
+      cursor:pointer; transition:background .15s;
+    }
+    .close-btn:hover { background:#3f3f46; }
+
+    /* Period selector */
+    .period-btns { display:flex; gap:4px; }
+    .period-btn {
+      height:26px; padding:0 10px;
+      background:var(--faint); color:var(--dim);
+      border:none; border-radius:6px;
+      font-size:11px; font-weight:600;
+      cursor:pointer; transition:all .15s;
+    }
+    .period-btn.active { background:var(--gold); color:#000; }
+    .period-btn:hover:not(.active) { color:var(--ink); }
+
+    /* Settings */
+    #settings-modal .sheet { max-width:500px; }
+    .form-group { margin-bottom:20px; }
+    .form-group label {
+      display:block; font-size:10.5px; font-weight:600; color:var(--dim);
+      letter-spacing:.08em; text-transform:uppercase; margin-bottom:8px;
+    }
+    .form-group input {
+      width:100%; padding:10px 14px;
+      background:var(--bg); border:1px solid var(--faint);
+      border-radius:8px; color:var(--ink);
+      font-size:13.5px; font-family:inherit; outline:none;
+      transition:border-color .15s;
+    }
+    .form-group input:focus { border-color:var(--gold); }
+    .form-row { display:flex; gap:14px; }
+    .form-row .form-group { flex:1; }
+
+    /* ── Toast ── */
+    #toast {
+      position:fixed; bottom:28px; left:50%;
+      transform: translateX(-50%) translateY(16px); opacity:0;
+      background:#1c1c1e; border:1px solid var(--faint);
+      border-radius:20px; padding:9px 18px;
+      font-size:12.5px; font-weight:500; white-space:nowrap;
+      transition: all .25s cubic-bezier(.22,1,.36,1);
+      z-index:400; pointer-events:none;
+    }
+    #toast.show  { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.success { border-color:var(--up);   color:var(--up); }
+    #toast.error   { border-color:var(--down); color:var(--down); }
+
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--faint); border-radius:2px; }
+
+    @media (max-width:600px) {
+      header, .meta-bar, .container { padding-left:16px; padding-right:16px; }
+      .status-dots .dot-item span { display:none; }
+      .price-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loader"></div>
+
+<header>
+  <div class="wordmark"><div class="wordmark-dot"></div>Market Briefing</div>
+  <div class="header-right">
+    <div class="status-dots">
+      <div class="dot-item"><div class="dot" id="dot-gemini"></div><span>Gemini</span></div>
+      <div class="dot-item"><div class="dot" id="dot-telegram"></div><span>Telegram</span></div>
+    </div>
+    <button class="icon-btn" onclick="openSettings()" title="Settings">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+    <button id="run-btn" onclick="runNow()">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="1,1 9,5 1,9"/></svg>
+      Run Now
+    </button>
+  </div>
+</header>
+
+<div class="meta-bar">
+  <span>Last run <strong id="last-run">—</strong></span>
+  <span class="meta-sep">·</span>
+  <span>Next <strong id="next-run">—</strong></span>
+  <div id="status-pill">
+    <div id="status-pulse"></div>
+    <span id="status-text">Idle</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div id="progress-section">
+    <ul id="progress-log"></ul>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('markets')">Markets</button>
+    <button class="tab-btn" onclick="switchTab('latest')">Daily</button>
+    <button class="tab-btn" onclick="switchTab('monthly')">Monthly</button>
+    <button class="tab-btn" onclick="switchTab('quarterly')">Quarterly</button>
+    <button class="tab-btn" onclick="switchTab('history')">Archive</button>
+  </div>
+
+  <!-- Markets tab -->
+  <div id="tab-markets" class="tab-panel active">
+    <div class="live-row">
+      <div class="live-badge"><div class="live-badge-dot"></div> Live</div>
+      <span id="live-updated" style="font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums"></span>
+    </div>
+
+    <div class="grid-section">
+      <div class="grid-section-label">Indices</div>
+      <div class="price-grid" id="grid-index"></div>
+    </div>
+    <div class="grid-section">
+      <div class="grid-section-label">Crypto</div>
+      <div class="price-grid" id="grid-crypto"></div>
+    </div>
+    <div class="grid-section">
+      <div class="grid-section-label">Commodities &amp; Forex</div>
+      <div class="price-grid" id="grid-other"></div>
+    </div>
+  </div>
+
+  <!-- Daily tab -->
+  <div id="tab-latest" class="tab-panel">
+    <div id="briefing-ts"></div>
+    <div id="briefing-content"><span class="placeholder">Hit Run Now to generate today's market briefing.</span></div>
+  </div>
+
+  <!-- Monthly tab -->
+  <div id="tab-monthly" class="tab-panel">
+    <div class="archive-header">
+      <h2>Sector Wraps</h2>
+      <button class="archive-run-btn" id="run-monthly-btn" onclick="runMonthly()">Generate</button>
+    </div>
+    <div id="monthly-heatmap" style="margin-bottom:32px"></div>
+    <ul class="archive-list" id="monthly-list"><li class="archive-empty">No monthly wraps yet.</li></ul>
+  </div>
+
+  <!-- Quarterly tab -->
+  <div id="tab-quarterly" class="tab-panel">
+    <div class="archive-header">
+      <h2>Macro Theses</h2>
+      <button class="archive-run-btn" id="run-quarterly-btn" onclick="runQuarterly()">Generate</button>
+    </div>
+    <ul class="archive-list" id="quarterly-list"><li class="archive-empty">No quarterly theses yet.</li></ul>
+  </div>
+
+  <!-- Archive tab -->
+  <div id="tab-history" class="tab-panel">
+    <div class="archive-header"><h2>Daily Archive</h2></div>
+    <ul class="archive-list" id="history-list"><li class="archive-empty">No archive yet.</li></ul>
+  </div>
+
+</div>
+
+<!-- Chart sheet -->
+<div class="modal-overlay" id="chart-sheet" onclick="handleOverlayClick(event,'chart-sheet')">
+  <div class="sheet" style="max-width:900px">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <div>
+        <div class="sheet-title" id="chart-title">—</div>
+        <div class="sheet-meta"  id="chart-price">—</div>
+      </div>
+      <div class="period-btns">
+        <button class="period-btn active" onclick="changePeriod('5d',this)">5D</button>
+        <button class="period-btn" onclick="changePeriod('1mo',this)">1M</button>
+        <button class="period-btn" onclick="changePeriod('3mo',this)">3M</button>
+        <button class="period-btn" onclick="changePeriod('6mo',this)">6M</button>
+        <button class="period-btn" onclick="changePeriod('1y',this)">1Y</button>
+      </div>
+    </div>
+    <div class="sheet-body" style="padding:20px 28px">
+      <div id="chart-container"></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="close-btn" onclick="closeChart()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Briefing / history sheet -->
+<div class="modal-overlay" id="hist-modal" onclick="handleOverlayClick(event,'hist-modal')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <div>
+        <div class="sheet-title" id="hist-date-label">—</div>
+        <div class="sheet-meta"  id="hist-ts-label"></div>
+      </div>
+      <div class="sheet-nav">
+        <span class="nav-count" id="hist-record-count"></span>
+        <button class="nav-btn" id="hist-prev" onclick="histNav(-1)">‹</button>
+        <button class="nav-btn" id="hist-next" onclick="histNav(1)">›</button>
+      </div>
+    </div>
+    <div class="sheet-body"><div id="hist-content"></div></div>
+    <div class="sheet-foot"><button class="close-btn" onclick="closeHistModal()">Close</button></div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="modal-overlay" id="settings-modal" onclick="handleOverlayClick(event,'settings-modal')">
+  <div class="sheet" style="max-width:500px">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><div class="sheet-title">Settings</div></div>
+    <div class="sheet-body">
+      <div class="form-group">
+        <label>Gemini API Key</label>
+        <input type="password" id="s-gemini" placeholder="AIzaSy… (leave blank to keep)" />
+      </div>
+      <div class="form-group">
+        <label>Telegram Bot Token</label>
+        <input type="password" id="s-token" placeholder="123456:ABC… (leave blank to keep)" />
+      </div>
+      <div class="form-group">
+        <label>Telegram Chat ID</label>
+        <input type="text" id="s-chat" placeholder="e.g. 1588383448" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Hour WIB (0–23)</label>
+          <input type="number" id="s-hour" min="0" max="23" placeholder="7" />
+        </div>
+        <div class="form-group">
+          <label>Minute (0–59)</label>
+          <input type="number" id="s-min" min="0" max="59" placeholder="0" />
+        </div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="close-btn" onclick="closeSettings()">Cancel</button>
+      <button class="close-btn" style="background:var(--gold);color:#000" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let eventSource = null;
+  let _chart = null, _candleSeries = null, _chartTicker = '', _chartPeriod = '5d';
+
+  // ── Loader ────────────────────────────────────────────────────────────────────
+  function loaderStart() {
+    const el = document.getElementById('loader');
+    el.style.transition = 'width 8s cubic-bezier(.1,1,.1,1)';
+    el.style.width = '85%';
+    el.classList.remove('done');
+  }
+  function loaderDone() {
+    const el = document.getElementById('loader');
+    el.style.transition = 'width .2s ease';
+    el.style.width = '100%';
+    setTimeout(() => el.classList.add('done'), 200);
+    setTimeout(() => { el.style.width = '0%'; el.style.transition = 'none'; }, 700);
+  }
+
+  // ── Status ────────────────────────────────────────────────────────────────────
+  async function loadStatus() {
+    const res = await fetch('/api/status');
+    const d   = await res.json();
+    document.getElementById('last-run').textContent = d.last_run || 'never';
+    document.getElementById('next-run').textContent = d.next_run || '—';
+    const pulse = document.getElementById('status-pulse');
+    const stxt  = document.getElementById('status-text');
+    if (d.running) { pulse.classList.add('running'); stxt.textContent = 'Running'; }
+    else {
+      pulse.classList.remove('running');
+      stxt.textContent = d.last_error ? 'Error' : 'Idle';
+      pulse.style.background = d.last_error ? 'var(--down)' : 'var(--up)';
+    }
+    document.getElementById('dot-gemini').className   = 'dot ' + (d.gemini_ok   ? 'on' : 'off');
+    document.getElementById('dot-telegram').className = 'dot ' + (d.telegram_ok ? 'on' : 'off');
+    if (d.has_briefing && d.briefing) {
+      document.getElementById('briefing-content').textContent = d.briefing;
+      document.getElementById('briefing-ts').textContent = (d.last_run || '').toUpperCase();
+    }
+  }
+
+  // ── Live prices ───────────────────────────────────────────────────────────────
+  const CATEGORY_GRIDS = { index:'grid-index', crypto:'grid-crypto', commodity:'grid-other', forex:'grid-other' };
+  let _priceStream = null;
+
+  function formatPrice(price, name) {
+    if (name.includes('/IDR') || name === 'IHSG') return price.toLocaleString('en-US', {maximumFractionDigits:0});
+    if (price > 10000) return price.toLocaleString('en-US', {maximumFractionDigits:0});
+    if (price > 100)   return price.toLocaleString('en-US', {maximumFractionDigits:2});
+    return price.toLocaleString('en-US', {maximumFractionDigits:4});
+  }
+
+  function renderPrices(d) {
+    document.getElementById('live-updated').textContent = d.updated;
+
+    d.items.forEach(item => {
+      const id   = 'card-' + item.ticker.replace(/[^a-zA-Z0-9]/g, '_');
+      const cls  = item.change > 0 ? 'up' : item.change < 0 ? 'down' : 'flat';
+      const sign = item.change > 0 ? '+' : '';
+      const priceStr  = formatPrice(item.price, item.name);
+      const changeStr = `${sign}${item.change.toFixed(2)}%`;
+
+      let card = document.getElementById(id);
+
+      if (!card) {
+        // First render — create card in the right grid
+        const gridId = CATEGORY_GRIDS[item.category] || 'grid-other';
+        const grid   = document.getElementById(gridId);
+        if (!grid) return;
+        card = document.createElement('div');
+        card.id        = id;
+        card.className = 'price-card';
+        card.onclick   = () => openChart(item.ticker, item.name);
+        card.innerHTML = `
+          <div class="price-card-label">${item.name}</div>
+          <div class="price-card-value" id="${id}-v">${priceStr}</div>
+          <div class="price-card-change ${cls}" id="${id}-c">${changeStr}</div>
+        `;
+        grid.appendChild(card);
+      } else {
+        // Update existing card — only touch what changed
+        const vEl = document.getElementById(id + '-v');
+        const cEl = document.getElementById(id + '-c');
+        if (vEl && vEl.textContent !== priceStr) {
+          vEl.textContent = priceStr;
+          // Flash animation
+          card.classList.remove('flash-up', 'flash-down');
+          void card.offsetWidth; // reflow to restart animation
+          if (item.up)   card.classList.add('flash-up');
+          if (item.down) card.classList.add('flash-down');
+        }
+        if (cEl) {
+          cEl.textContent = changeStr;
+          cEl.className   = `price-card-change ${cls}`;
+        }
+      }
+    });
+  }
+
+  async function loadLive() {
+    try {
+      const res = await fetch('/api/live');
+      const d   = await res.json();
+      renderPrices(d);
+    } catch(e) { /* silent */ }
+  }
+
+  function startPriceStream() {
+    if (_priceStream) _priceStream.close();
+    _priceStream = new EventSource('/api/prices/stream');
+    _priceStream.onmessage = (e) => {
+      try { renderPrices(JSON.parse(e.data)); } catch(_) {}
+    };
+    _priceStream.onerror = () => {
+      // Reconnect after 5s on error
+      _priceStream.close();
+      setTimeout(startPriceStream, 5000);
+    };
+  }
+
+  // ── Chart ─────────────────────────────────────────────────────────────────────
+  async function openChart(ticker, name) {
+    _chartTicker = ticker;
+    document.getElementById('chart-title').textContent = name;
+    document.getElementById('chart-price').textContent = '';
+    document.getElementById('chart-sheet').classList.add('visible');
+
+    // Reset period buttons
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.period-btn').classList.add('active');
+    _chartPeriod = '5d';
+    await loadChartData();
+  }
+
+  async function loadChartData() {
+    const container = document.getElementById('chart-container');
+
+    // Destroy existing chart
+    if (_chart) { _chart.remove(); _chart = null; _candleSeries = null; }
+
+    _chart = LightweightCharts.createChart(container, {
+      width:  container.clientWidth,
+      height: 380,
+      layout: { background: { color: '#111111' }, textColor: '#a1a1aa' },
+      grid:   { vertLines: { color: '#18181b' }, horzLines: { color: '#18181b' } },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      rightPriceScale: { borderColor: '#27272a' },
+      timeScale: { borderColor: '#27272a', timeVisible: true },
+    });
+
+    _candleSeries = _chart.addCandlestickSeries({
+      upColor:          '#4ade80',
+      downColor:        '#f87171',
+      borderUpColor:    '#4ade80',
+      borderDownColor:  '#f87171',
+      wickUpColor:      '#4ade80',
+      wickDownColor:    '#f87171',
+    });
+
+    try {
+      const res  = await fetch(`/api/chart-data/${_chartTicker}?p=${_chartPeriod}`);
+      const data = await res.json();
+      if (data.bars && data.bars.length) {
+        _candleSeries.setData(data.bars);
+        _chart.timeScale().fitContent();
+        const last = data.bars[data.bars.length - 1];
+        document.getElementById('chart-price').textContent = `Close ${last.close.toLocaleString()}`;
+      }
+    } catch(e) { /* silent */ }
+
+    // Responsive resize
+    const ro = new ResizeObserver(() => {
+      if (_chart) _chart.applyOptions({ width: container.clientWidth });
+    });
+    ro.observe(container);
+  }
+
+  async function changePeriod(period, btn) {
+    _chartPeriod = period;
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    await loadChartData();
+  }
+
+  function closeChart() {
+    document.getElementById('chart-sheet').classList.remove('visible');
+    if (_chart) { _chart.remove(); _chart = null; }
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────────
+  const TAB_NAMES = ['markets','latest','monthly','quarterly','history'];
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', TAB_NAMES[i] === name));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'markets')   { loadLive(); startPriceStream(); }
+    if (name === 'history')   loadHistory();
+    if (name === 'monthly')   loadMonthlyList();
+    if (name === 'quarterly') loadQuarterlyList();
+  }
+
+  // ── SSE helper ────────────────────────────────────────────────────────────────
+  function attachStream(onBriefing, onDone, resetBtn) {
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource('/api/stream');
+    const log = document.getElementById('progress-log');
+    eventSource.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'ping') return;
+      if (msg.type === 'step') {
+        const li = document.createElement('li'); li.textContent = msg.text; log.appendChild(li); return;
+      }
+      if (msg.type === 'briefing') { onBriefing(msg.text); return; }
+      if (msg.type === 'error')    { toast('Error: ' + msg.text, 'error'); }
+      if (msg.type === 'done' || msg.type === 'error') {
+        eventSource.close(); loaderDone(); resetBtn();
+        document.getElementById('progress-section').classList.remove('visible');
+        loadStatus();
+        if (msg.type === 'done') onDone();
+      }
+    };
+  }
+
+  // ── Run Daily ─────────────────────────────────────────────────────────────────
+  async function runNow() {
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span style="opacity:.6;font-size:10px">●</span> Running';
+    document.getElementById('progress-log').innerHTML = '';
+    document.getElementById('progress-section').classList.add('visible');
+    loaderStart();
+    const res = await fetch('/api/run', { method: 'POST' });
+    if (!res.ok) {
+      toast('Already running', 'error'); loaderDone();
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="1,1 9,5 1,9"/></svg> Run Now';
+      return;
+    }
+    attachStream(
+      (text) => {
+        document.getElementById('briefing-content').textContent = text;
+        document.getElementById('briefing-ts').textContent = new Date().toLocaleString('en-US',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).toUpperCase();
+      },
+      () => toast('Briefing ready', 'success'),
+      () => {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="1,1 9,5 1,9"/></svg> Run Now';
+      }
+    );
+  }
+
+  // ── Archive helpers ───────────────────────────────────────────────────────────
+  function renderArchive(listId, items, labelFn, subFn, clickFn) {
+    const el = document.getElementById(listId);
+    if (!items || !items.length) { el.innerHTML = '<li class="archive-empty">Nothing here yet.</li>'; return; }
+    el.innerHTML = items.map(item => `
+      <li class="archive-item" onclick="${clickFn(item)}">
+        <div>
+          <div class="archive-date">${labelFn(item)}</div>
+          <div class="archive-sub">${subFn(item)}</div>
+        </div>
+        <span class="archive-arrow">→</span>
+      </li>`).join('');
+  }
+
+  // ── Daily archive ─────────────────────────────────────────────────────────────
+  async function loadHistory() {
+    const res = await fetch('/api/history');
+    const d   = await res.json();
+    renderArchive('history-list', d.dates, x => x, () => 'Daily briefing', x => `openHistModal('${x}')`);
+  }
+
+  let _histRecords = [], _histIdx = 0;
+  async function openHistModal(date) {
+    const res = await fetch('/api/history/' + date);
+    const d   = await res.json();
+    _histRecords = d.records || [];
+    _histIdx     = _histRecords.length - 1;
+    renderHistRecord();
+    document.getElementById('hist-modal').classList.add('visible');
+  }
+  function renderHistRecord() {
+    const r = _histRecords[_histIdx];
+    if (!r) return;
+    document.getElementById('hist-date-label').textContent = r.timestamp ? new Date(r.timestamp).toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) : '—';
+    document.getElementById('hist-ts-label').textContent   = r.timestamp ? new Date(r.timestamp).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) + ' WIB' : '';
+    document.getElementById('hist-content').textContent    = r.briefing || '';
+    document.getElementById('hist-record-count').textContent = _histRecords.length > 1 ? `${_histIdx+1} / ${_histRecords.length}` : '';
+    document.getElementById('hist-prev').style.display = '';
+    document.getElementById('hist-next').style.display = '';
+    document.getElementById('hist-prev').disabled = _histIdx <= 0;
+    document.getElementById('hist-next').disabled = _histIdx >= _histRecords.length - 1;
+  }
+  function histNav(dir) { _histIdx = Math.max(0, Math.min(_histRecords.length-1, _histIdx+dir)); renderHistRecord(); }
+
+  // ── Heatmap ───────────────────────────────────────────────────────────────────
+  function heatColor(pct) {
+    const abs = Math.min(Math.abs(pct), 8);
+    const t   = abs / 8;
+    if (pct >= 0) {
+      const r = Math.round(22  + (74  - 22)  * t);
+      const g = Math.round(163 + (222 - 163) * t);
+      const b = Math.round(74  + (128 - 74)  * t);
+      return `rgb(${r},${g},${b})`;
+    } else {
+      const r = Math.round(239 + (185 - 239) * t);
+      const g = Math.round(68  + (28  - 68)  * t);
+      const b = Math.round(68  + (28  - 68)  * t);
+      return `rgb(${r},${g},${b})`;
+    }
+  }
+
+  function renderHeatmap(containerId, sectors) {
+    const el = document.getElementById(containerId);
+    if (!sectors || !Object.keys(sectors).length) { el.innerHTML = ''; return; }
+    const cells = Object.entries(sectors).map(([name, d]) => {
+      const bg = heatColor(d.return_pct);
+      return `<div class="heat-cell" style="background:${bg}" onclick="openChart('${d.ticker}','${name}')">
+        <div class="heat-name">${name}</div>
+        <div class="heat-pct">${d.return_pct > 0 ? '+' : ''}${d.return_pct.toFixed(1)}%</div>
+      </div>`;
+    }).join('');
+    el.innerHTML = `<div class="grid-section-label" style="margin-bottom:12px">US Sector Performance (30d)</div><div class="heatmap">${cells}</div>`;
+  }
+
+  // ── Monthly ───────────────────────────────────────────────────────────────────
+  async function loadMonthlyList() {
+    const res = await fetch('/api/monthly');
+    const d   = await res.json();
+    renderArchive('monthly-list', d.months, m => m, () => 'Sector rotation wrap', m => `openTextModal('/api/monthly/${m}','wrap','${m} — Sector Wrap')`);
+    // Show heatmap from most recent month
+    if (d.months && d.months.length) {
+      const r2 = await fetch('/api/monthly/' + d.months[0]);
+      const m  = await r2.json();
+      if (m.us_sectors) renderHeatmap('monthly-heatmap', m.us_sectors);
+    }
+  }
+
+  async function runMonthly() {
+    const btn = document.getElementById('run-monthly-btn');
+    btn.disabled = true; btn.textContent = 'Running…';
+    document.getElementById('progress-log').innerHTML = '';
+    document.getElementById('progress-section').classList.add('visible');
+    loaderStart();
+    const res = await fetch('/api/monthly/run', { method: 'POST' });
+    if (!res.ok) { toast('Already running','error'); btn.disabled=false; btn.textContent='Generate'; loaderDone(); return; }
+    attachStream(
+      (text) => openSheet('Monthly Sector Wrap', new Date().toLocaleDateString(), text, false),
+      () => { toast('Monthly wrap ready','success'); loadMonthlyList(); },
+      () => { btn.disabled=false; btn.textContent='Generate'; }
+    );
+  }
+
+  // ── Quarterly ─────────────────────────────────────────────────────────────────
+  async function loadQuarterlyList() {
+    const res = await fetch('/api/quarterly');
+    const d   = await res.json();
+    renderArchive('quarterly-list', d.quarters, q => q, () => 'Big-theme macro thesis', q => `openTextModal('/api/quarterly/${q}','thesis','${q} — Macro Thesis')`);
+  }
+
+  async function runQuarterly() {
+    const btn = document.getElementById('run-quarterly-btn');
+    btn.disabled = true; btn.textContent = 'Running…';
+    document.getElementById('progress-log').innerHTML = '';
+    document.getElementById('progress-section').classList.add('visible');
+    loaderStart();
+    const res = await fetch('/api/quarterly/run', { method: 'POST' });
+    if (!res.ok) { toast('Already running','error'); btn.disabled=false; btn.textContent='Generate'; loaderDone(); return; }
+    attachStream(
+      (text) => openSheet('Quarterly Macro Thesis', new Date().toLocaleDateString(), text, false),
+      () => { toast('Quarterly thesis ready','success'); loadQuarterlyList(); },
+      () => { btn.disabled=false; btn.textContent='Generate'; }
+    );
+  }
+
+  // ── Shared sheet opener ───────────────────────────────────────────────────────
+  function openSheet(title, ts, content) {
+    document.getElementById('hist-date-label').textContent = title;
+    document.getElementById('hist-ts-label').textContent   = ts;
+    document.getElementById('hist-content').textContent    = content;
+    document.getElementById('hist-prev').style.display     = 'none';
+    document.getElementById('hist-next').style.display     = 'none';
+    document.getElementById('hist-record-count').textContent = '';
+    document.getElementById('hist-modal').classList.add('visible');
+  }
+
+  async function openTextModal(url, field, title) {
+    const res = await fetch(url);
+    const d   = await res.json();
+    openSheet(title, d.timestamp ? new Date(d.timestamp).toLocaleString() : '', d[field] || '(no content)');
+  }
+
+  // ── Settings ──────────────────────────────────────────────────────────────────
+  async function openSettings() {
+    const res = await fetch('/api/settings');
+    const d   = await res.json();
+    document.getElementById('s-chat').value = d.chat_id || '';
+    document.getElementById('s-hour').value = d.briefing_hour || '7';
+    document.getElementById('s-min').value  = d.briefing_min  || '0';
+    document.getElementById('settings-modal').classList.add('visible');
+  }
+  function closeSettings() { document.getElementById('settings-modal').classList.remove('visible'); }
+  async function saveSettings() {
+    const body = {
+      gemini_key:    document.getElementById('s-gemini').value,
+      bot_token:     document.getElementById('s-token').value,
+      chat_id:       document.getElementById('s-chat').value,
+      briefing_hour: document.getElementById('s-hour').value,
+      briefing_min:  document.getElementById('s-min').value,
+    };
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    closeSettings(); toast('Saved','success'); loadStatus();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+  function closeHistModal() { document.getElementById('hist-modal').classList.remove('visible'); }
+  function handleOverlayClick(e, id) { if (e.target===e.currentTarget) document.getElementById(id).classList.remove('visible'); }
+  function toast(msg, type='success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'show ' + type;
+    clearTimeout(el._t); el._t = setTimeout(() => el.className='', 2800);
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
+  loadStatus();
+  loadLive();          // immediate snapshot on page load
+  startPriceStream();  // then SSE for live updates
+  setInterval(loadStatus, 10000);
+</script>
+</body>
+</html>

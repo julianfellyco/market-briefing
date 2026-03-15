@@ -10,7 +10,7 @@ from pathlib import Path
 import pytz
 
 WIB      = pytz.timezone("Asia/Jakarta")
-MODEL    = "gemini-2.5-flash"
+MODEL    = "claude-opus-4-6"
 HIST_DIR = Path(__file__).parent / "history" / "monthly"
 
 
@@ -48,24 +48,28 @@ def run_monthly_wrap() -> dict:
 
 
 def generate_monthly_wrap(data: dict) -> str:
-    key = os.environ.get("GEMINI_API_KEY")
+    key = os.environ.get("ANTHROPIC_API_KEY")
     if key:
         try:
-            return _gemini_wrap(data, key)
+            return _claude_wrap(data, key)
         except Exception as e:
-            print(f"\n⚠️  Gemini error ({e.__class__.__name__}), using template.")
+            print(f"\n⚠️  Claude error ({e.__class__.__name__}), using template.")
     return _template_wrap(data)
 
 
-# ── Gemini ─────────────────────────────────────────────────────────────────────
+# ── Claude ─────────────────────────────────────────────────────────────────────
 
-def _gemini_wrap(data: dict, api_key: str) -> str:
-    import requests
-    url  = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
-    body = {"contents": [{"parts": [{"text": _build_prompt(data)}]}]}
-    r    = requests.post(url, json=body, params={"key": api_key}, timeout=60)
-    r.raise_for_status()
-    return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+def _claude_wrap(data: dict, api_key: str) -> str:
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+    with client.messages.stream(
+        model=MODEL,
+        max_tokens=4096,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user", "content": _build_prompt(data)}],
+    ) as stream:
+        msg = stream.get_final_message()
+    return "\n".join(b.text for b in msg.content if b.type == "text")
 
 
 def _build_prompt(data: dict) -> str:

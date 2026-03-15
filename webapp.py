@@ -32,7 +32,8 @@ _state = {
     "last_briefing": None,
     "last_error": None,
 }
-_log_queue: queue.Queue = queue.Queue()
+_subscribers: list = []
+_subs_lock = threading.Lock()
 
 # ── Live price cache ──────────────────────────────────────────────────────────
 _live_cache = {"data": None, "ts": 0}
@@ -65,7 +66,7 @@ def status():
         "has_briefing":  _state["last_briefing"] is not None,
         "briefing":      _state["last_briefing"],
         "telegram_ok":   bool(os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID")),
-        "gemini_ok":     bool(os.environ.get("GEMINI_API_KEY")),
+        "claude_ok":     bool(os.environ.get("ANTHROPIC_API_KEY")),
     })
 
 
@@ -93,34 +94,45 @@ def run_now():
             from charts import generate_chart
             from history import save_briefing
 
-            _log("step", "📊 Fetching US indices...")
-            us = get_us_indices()
-            _log("step", "🇮🇩 Fetching IHSG...")
-            ihsg = get_ihsg()
-            _log("step", "📈 Fetching IDX movers...")
-            movers = get_idx_movers()
-            _log("step", "₿ Fetching crypto prices...")
-            cp  = get_crypto_prices()
-            gmc = get_global_market_cap()
-            tcm = get_top_movers()
-            _log("step", "📰 Fetching news...")
-            news = fetch_news()
-            _log("step", "💱 Fetching forex rates...")
-            forex = get_forex()
-            _log("step", "🥇 Fetching commodities...")
-            commodities = get_commodities()
-            _log("step", "😱 Fetching Fear & Greed...")
-            cfg = get_crypto_fear_greed()
-            sfg = get_stock_fear_greed()
-            _log("step", "🤖 Generating briefing...")
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            from sources.utils import safe_fetch
 
-            data = {
-                "us_indices": us, "ihsg": ihsg, "idx_movers": movers,
-                "crypto_prices": cp, "global_mc": gmc,
-                "top_crypto_movers": tcm, "news": news,
-                "forex": forex, "commodities": commodities,
-                "crypto_fear_greed": cfg, "stock_fear_greed": sfg,
+            _fetch_jobs = {
+                "us_indices":        (get_us_indices,       {},                              "📊 US indices"),
+                "ihsg":              (get_ihsg,              {},                              "🇮🇩 IHSG"),
+                "idx_movers":        (get_idx_movers,        {"gainers":[],"losers":[]},      "📈 IDX movers"),
+                "crypto_prices":     (get_crypto_prices,     {},                              "₿ Crypto prices"),
+                "global_mc":         (get_global_market_cap, {},                              "₿ Global market cap"),
+                "top_crypto_movers": (get_top_movers,        {},                              "₿ Crypto movers"),
+                "news":              (fetch_news,            {},                              "📰 News"),
+                "forex":             (get_forex,             {},                              "💱 Forex"),
+                "commodities":       (get_commodities,       {},                              "🥇 Commodities"),
+                "crypto_fear_greed": (get_crypto_fear_greed, {},                             "😱 Crypto F&G"),
+                "stock_fear_greed":  (get_stock_fear_greed,  {},                             "😱 Stock F&G"),
             }
+
+            _log("step", "🔄 Fetching all market data in parallel...")
+            data = {}
+            failed_sources = []
+            with ThreadPoolExecutor(max_workers=8) as ex:
+                futures = {
+                    ex.submit(safe_fetch, fn, default=default, label=label): key
+                    for key, (fn, default, label) in _fetch_jobs.items()
+                }
+                for future in as_completed(futures):
+                    key = futures[future]
+                    result = future.result()
+                    data[key] = result
+                    fn, default, label = _fetch_jobs[key]
+                    if result == default:
+                        failed_sources.append(label)
+
+            if failed_sources:
+                _log("step", f"⚠️ Unavailable: {', '.join(failed_sources)}")
+            else:
+                _log("step", "✓ All sources fetched")
+
+            _log("step", "🤖 Generating briefing with Claude...")
             briefing = generate_briefing(data)
             _state["last_briefing"] = briefing
             _state["last_run"] = datetime.now(WIB).strftime("%A, %b %d — %H:%M WIB")
@@ -167,21 +179,21 @@ def run_now():
 
 @app.route("/api/stream")
 def stream():
+    """SSE log stream — one queue per client, no message loss between tabs."""
+    q = _subscribe()
+
     def event_stream():
-        # drain any stale messages
-        while not _log_queue.empty():
-            try:
-                _log_queue.get_nowait()
-            except queue.Empty:
-                break
-        while True:
-            try:
-                msg = _log_queue.get(timeout=30)
-                yield f"data: {json.dumps(msg)}\n\n"
-                if msg["type"] in ("done", "error"):
-                    break
-            except queue.Empty:
-                yield "data: {\"type\": \"ping\"}\n\n"
+        try:
+            while True:
+                try:
+                    msg = q.get(timeout=30)
+                    yield f"data: {json.dumps(msg)}\n\n"
+                    if msg["type"] in ("done", "error"):
+                        break
+                except queue.Empty:
+                    yield 'data: {"type":"ping"}\n\n'
+        finally:
+            _unsubscribe(q)
 
     return Response(stream_with_context(event_stream()), mimetype="text/event-stream")
 
@@ -426,7 +438,7 @@ def get_history_date(date: str):
 @app.route("/api/settings", methods=["GET"])
 def get_settings():
     return jsonify({
-        "gemini_key":    "set" if os.environ.get("GEMINI_API_KEY") else "",
+        "claude_key":    "set" if os.environ.get("ANTHROPIC_API_KEY") else "",
         "bot_token":     "set" if os.environ.get("TELEGRAM_BOT_TOKEN") else "",
         "chat_id":       os.environ.get("TELEGRAM_CHAT_ID", ""),
         "briefing_hour": os.environ.get("BRIEFING_HOUR", "7"),
@@ -463,7 +475,7 @@ def health():
         "last_run":     _state["last_run"],
         "last_error":   _state["last_error"],
         "cache_age_s":  cache_age,
-        "gemini_ok":    bool(os.environ.get("GEMINI_API_KEY")),
+        "claude_ok":    bool(os.environ.get("ANTHROPIC_API_KEY")),
         "telegram_ok":  bool(os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID")),
     })
 
@@ -476,9 +488,11 @@ def market_status():
 
 @app.route("/api/settings", methods=["POST"])
 def save_settings():
+    if not _is_authorized():
+        return jsonify({"error": "Unauthorized"}), 401
     body = request.json or {}
     mapping = {
-        "gemini_key":    "GEMINI_API_KEY",
+        "claude_key":    "ANTHROPIC_API_KEY",
         "bot_token":     "TELEGRAM_BOT_TOKEN",
         "chat_id":       "TELEGRAM_CHAT_ID",
         "briefing_hour": "BRIEFING_HOUR",
@@ -495,8 +509,45 @@ def save_settings():
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _is_authorized() -> bool:
+    """Return True if the request carries a valid API_SECRET (or none is configured)."""
+    secret = os.environ.get("API_SECRET", "")
+    if not secret:
+        return True  # dev mode — no secret set
+    token = request.headers.get("X-API-Secret") or request.args.get("token", "")
+    return token == secret
+
+
 def _log(msg_type: str, text: str):
-    _log_queue.put({"type": msg_type, "text": text})
+    """Broadcast a log message to all connected SSE subscribers."""
+    msg = {"type": msg_type, "text": text}
+    with _subs_lock:
+        dead = []
+        for q in _subscribers:
+            try:
+                q.put_nowait(msg)
+            except queue.Full:
+                dead.append(q)
+        for q in dead:
+            try:
+                _subscribers.remove(q)
+            except ValueError:
+                pass
+
+
+def _subscribe() -> queue.Queue:
+    q: queue.Queue = queue.Queue(maxsize=200)
+    with _subs_lock:
+        _subscribers.append(q)
+    return q
+
+
+def _unsubscribe(q: queue.Queue) -> None:
+    with _subs_lock:
+        try:
+            _subscribers.remove(q)
+        except ValueError:
+            pass
 
 
 def _write_env(key: str, value: str):

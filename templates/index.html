@@ -433,7 +433,7 @@
   <div class="wordmark"><div class="wordmark-dot"></div>Market Briefing</div>
   <div class="header-right">
     <div class="status-dots">
-      <div class="dot-item"><div class="dot" id="dot-gemini"></div><span>Gemini</span></div>
+      <div class="dot-item"><div class="dot" id="dot-claude"></div><span>Claude</span></div>
       <div class="dot-item"><div class="dot" id="dot-telegram"></div><span>Telegram</span></div>
     </div>
     <button class="icon-btn" onclick="openSettings()" title="Settings">
@@ -625,8 +625,12 @@
     <div class="sheet-head"><div class="sheet-title">Settings</div></div>
     <div class="sheet-body">
       <div class="form-group">
-        <label>Gemini API Key</label>
-        <input type="password" id="s-gemini" placeholder="AIzaSy… (leave blank to keep)" />
+        <label>Dashboard Password</label>
+        <input type="password" id="s-secret" placeholder="API_SECRET from .env (if set)" />
+      </div>
+      <div class="form-group">
+        <label>Anthropic API Key</label>
+        <input type="password" id="s-claude" placeholder="sk-ant-… (leave blank to keep)" />
       </div>
       <div class="form-group">
         <label>Telegram Bot Token</label>
@@ -691,7 +695,7 @@
         stxt.textContent = d.last_error ? 'Error' : 'Idle';
         pulse.style.background = d.last_error ? 'var(--down)' : 'var(--up)';
       }
-      document.getElementById('dot-gemini').className   = 'dot ' + (d.gemini_ok   ? 'on' : 'off');
+      document.getElementById('dot-claude').className   = 'dot ' + (d.claude_ok   ? 'on' : 'off');
       document.getElementById('dot-telegram').className = 'dot ' + (d.telegram_ok ? 'on' : 'off');
       if (d.has_briefing && d.briefing) {
         document.getElementById('briefing-content').textContent = d.briefing;
@@ -1078,13 +1082,17 @@
   function closeSettings() { document.getElementById('settings-modal').classList.remove('visible'); }
   async function saveSettings() {
     const body = {
-      gemini_key:    document.getElementById('s-gemini').value,
+      claude_key:    document.getElementById('s-claude').value,
       bot_token:     document.getElementById('s-token').value,
       chat_id:       document.getElementById('s-chat').value,
       briefing_hour: document.getElementById('s-hour').value,
       briefing_min:  document.getElementById('s-min').value,
     };
-    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const secret = document.getElementById('s-secret').value;
+    const headers = {'Content-Type':'application/json'};
+    if (secret) headers['X-API-Secret'] = secret;
+    const resp = await fetch('/api/settings',{method:'POST',headers,body:JSON.stringify(body)});
+    if (resp.status === 401) { toast('Wrong dashboard password','error'); return; }
     closeSettings(); toast('Saved','success'); loadStatus();
   }
 

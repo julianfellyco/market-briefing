@@ -6,7 +6,7 @@ Data sources:
   - yfinance        → US indices + IDX/IHSG stocks (free, no key)
   - CoinGecko API   → Crypto prices (free, no key)
   - RSS feeds       → News (free, no key)
-  - Google Gemini   → AI summarizer (free tier, needs GEMINI_API_KEY)
+  - Claude Opus 4.6 → AI summarizer (needs ANTHROPIC_API_KEY)
   - Telegram Bot    → Delivery (free)
 
 Usage:
@@ -20,6 +20,7 @@ import argparse
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -33,6 +34,7 @@ from sources.news import fetch_news
 from sources.forex import get_forex
 from sources.commodities import get_commodities
 from sources.fear_greed import get_crypto_fear_greed, get_stock_fear_greed
+from sources.utils import safe_fetch, get_logger
 from summarizer import generate_briefing
 from delivery import get_chat_id, send_telegram, send_photo
 from charts import generate_chart
@@ -43,6 +45,7 @@ from quarterly_thesis import run_quarterly_thesis, _quarter_key
 load_dotenv()
 
 WIB = pytz.timezone("Asia/Jakarta")
+log = get_logger(__name__)
 
 
 # ── Core job ──────────────────────────────────────────────────────────────────
@@ -54,69 +57,47 @@ def run_briefing() -> None:
     print(f"🌅  Market Briefing  —  {now.strftime('%A, %B %d, %Y  %H:%M WIB')}")
     print(f"{divider}\n")
 
-    # ── Collect data ────────────────────────────────────────────────────────
-    print("📊  Fetching US indices...", end=" ", flush=True)
-    us_indices = get_us_indices()
-    print("✓")
-
-    print("🇮🇩  Fetching IHSG...", end=" ", flush=True)
-    ihsg = get_ihsg()
-    print("✓")
-
-    print("📈  Fetching IDX movers...", end=" ", flush=True)
-    idx_movers = get_idx_movers()
-    print("✓")
-
-    print("₿   Fetching crypto prices...", end=" ", flush=True)
-    crypto_prices = get_crypto_prices()
-    global_mc     = get_global_market_cap()
-    top_crypto    = get_top_movers()
-    print("✓")
-
-    print("📰  Fetching news RSS feeds...", end=" ", flush=True)
-    news = fetch_news()
-    print("✓")
-
-    print("💱  Fetching forex rates...", end=" ", flush=True)
-    forex = get_forex()
-    print("✓")
-
-    print("🥇  Fetching commodity prices...", end=" ", flush=True)
-    commodities = get_commodities()
-    print("✓")
-
-    print("😱  Fetching Fear & Greed...", end=" ", flush=True)
-    crypto_fg = get_crypto_fear_greed()
-    stock_fg  = get_stock_fear_greed()
-    print("✓")
-
-    data = {
-        "us_indices":        us_indices,
-        "ihsg":              ihsg,
-        "idx_movers":        idx_movers,
-        "crypto_prices":     crypto_prices,
-        "global_mc":         global_mc,
-        "top_crypto_movers": top_crypto,
-        "news":              news,
-        "forex":             forex,
-        "commodities":       commodities,
-        "crypto_fear_greed": crypto_fg,
-        "stock_fear_greed":  stock_fg,
+    # ── Collect data (parallel) ──────────────────────────────────────────────
+    print("🔄  Fetching all market data in parallel...", flush=True)
+    _fetch_jobs = {
+        "us_indices":        (get_us_indices,       {},                              "US indices"),
+        "ihsg":              (get_ihsg,              {},                              "IHSG"),
+        "idx_movers":        (get_idx_movers,        {"gainers": [], "losers": []},  "IDX movers"),
+        "crypto_prices":     (get_crypto_prices,     {},                              "crypto prices"),
+        "global_mc":         (get_global_market_cap, {},                              "global market cap"),
+        "top_crypto_movers": (get_top_movers,        {},                              "crypto movers"),
+        "news":              (fetch_news,            {},                              "news"),
+        "forex":             (get_forex,             {},                              "forex"),
+        "commodities":       (get_commodities,       {},                              "commodities"),
+        "crypto_fear_greed": (get_crypto_fear_greed, {},                             "crypto F&G"),
+        "stock_fear_greed":  (get_stock_fear_greed,  {},                             "stock F&G"),
     }
+    data = {}
+    failed = []
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {
+            ex.submit(safe_fetch, fn, default=default, label=label): key
+            for key, (fn, default, label) in _fetch_jobs.items()
+        }
+        for future in as_completed(futures):
+            key = futures[future]
+            result = future.result()
+            data[key] = result
+            fn, default, label = _fetch_jobs[key]
+            if result == default:
+                failed.append(label)
+
+    if failed:
+        print(f"⚠️  Data unavailable: {', '.join(failed)}")
+    else:
+        print("✓  All sources fetched")
 
     # ── Generate briefing ───────────────────────────────────────────────────
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    if not gemini_key:
-        print("\n❌  GEMINI_API_KEY not set.")
-        print("    Get a FREE key at: https://aistudio.google.com/app/apikey")
-        print("    Then run:  python run.py --setup")
-        return
-
-    print("\n🤖  Generating briefing with Gemini Flash...\n")
+    print("\n🤖  Generating briefing with Claude...\n")
     try:
         briefing = generate_briefing(data)
     except Exception as e:
-        print(f"❌  Gemini error: {e}")
+        print(f"❌  Briefing error: {e}")
         return
 
     print(briefing)
@@ -213,16 +194,15 @@ def setup() -> None:
     print("\n⚙️   Market Briefing Setup")
     print("=" * 40)
 
-    # Gemini key
-    print("\n── Step 1: Google Gemini API Key (FREE) ──")
-    print("  1. Go to: https://aistudio.google.com/app/apikey")
-    print("  2. Sign in with your Google account")
-    print("  3. Click 'Create API key'")
-    print("  4. Copy the key")
-    gemini = input("\nPaste Gemini API key (or Enter to skip): ").strip()
-    if gemini:
-        _write_env("GEMINI_API_KEY", gemini)
-        print("✅  Saved GEMINI_API_KEY")
+    # Claude / Anthropic key
+    print("\n── Step 1: Anthropic API Key ──")
+    print("  1. Go to: https://console.anthropic.com/")
+    print("  2. Settings → API Keys → Create Key")
+    print("  3. Copy the key (sk-ant-...)")
+    claude = input("\nPaste Anthropic API key (or Enter to skip): ").strip()
+    if claude:
+        _write_env("ANTHROPIC_API_KEY", claude)
+        print("✅  Saved ANTHROPIC_API_KEY")
 
     # Telegram bot
     print("\n── Step 2: Telegram Bot (FREE) ──")

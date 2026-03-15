@@ -480,7 +480,6 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('markets')">Markets</button>
     <button class="tab-btn" onclick="switchTab('latest')">Daily</button>
-    <button class="tab-btn" onclick="switchTab('monthly')">Monthly</button>
     <button class="tab-btn" onclick="switchTab('quarterly')">Quarterly</button>
     <button class="tab-btn" onclick="switchTab('history')">Archive</button>
   </div>
@@ -550,20 +549,24 @@
       </div>
     </div>
 
-    <!-- Sector Performance -->
+    <!-- Sector Wraps -->
     <div class="grid-section">
       <div class="sector-header">
-        <div class="grid-section-label" style="margin-bottom:0">Sector Performance</div>
-        <div class="period-btns" id="sector-period-btns">
-          <button class="period-btn active" onclick="setSectorPeriod('5d',this)">1W</button>
-          <button class="period-btn" onclick="setSectorPeriod('1mo',this)">1M</button>
-          <button class="period-btn" onclick="setSectorPeriod('3mo',this)">3M</button>
+        <div class="grid-section-label" style="margin-bottom:0">Sector Wraps</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="period-btns" id="sector-period-btns">
+            <button class="period-btn active" onclick="setSectorPeriod('5d',this)">1W</button>
+            <button class="period-btn" onclick="setSectorPeriod('1mo',this)">1M</button>
+            <button class="period-btn" onclick="setSectorPeriod('3mo',this)">3M</button>
+          </div>
+          <button class="archive-run-btn" id="run-monthly-btn" onclick="runMonthly()">Generate Wrap</button>
         </div>
       </div>
       <div id="sectors-loading"></div>
       <div id="sectors-us"></div>
       <div id="sectors-idx"></div>
       <div id="sectors-crypto"></div>
+      <ul class="archive-list" id="monthly-list" style="margin-top:24px"><li class="archive-empty">No wraps yet.</li></ul>
     </div>
 
   </div>
@@ -572,18 +575,6 @@
   <div id="tab-latest" class="tab-panel">
     <div id="briefing-ts"></div>
     <div id="briefing-content"><span class="placeholder">Hit Run Now to generate today's market briefing.</span></div>
-  </div>
-
-  <!-- ══ Monthly tab ══ -->
-  <div id="tab-monthly" class="tab-panel">
-    <div class="archive-header">
-      <h2>Sector Wraps</h2>
-      <button class="archive-run-btn" id="run-monthly-btn" onclick="runMonthly()">Generate</button>
-    </div>
-    <div id="monthly-heatmap-us"></div>
-    <div id="monthly-heatmap-idx"></div>
-    <div id="monthly-heatmap-crypto"></div>
-    <ul class="archive-list" id="monthly-list"><li class="archive-empty">No monthly wraps yet.</li></ul>
   </div>
 
   <!-- ══ Quarterly tab ══ -->
@@ -914,14 +905,13 @@
   }
 
   // ── Tabs ─────────────────────────────────────────────────────────────────────
-  const TAB_NAMES = ['markets','latest','monthly','quarterly','history'];
+  const TAB_NAMES = ['markets','latest','quarterly','history'];
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', TAB_NAMES[i] === name));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
-    if (name === 'markets')   { loadLive(); startPriceStream(); loadMovers(); loadMarketStatus(); loadSectors(); }
+    if (name === 'markets')   { loadLive(); startPriceStream(); loadMovers(); loadMarketStatus(); loadSectors(); loadMonthlyList(); }
     if (name === 'history')   loadHistory();
-    if (name === 'monthly')   loadMonthlyList();
     if (name === 'quarterly') loadQuarterlyList();
   }
 
@@ -1070,13 +1060,6 @@
     const res = await fetch('/api/monthly');
     const d   = await res.json();
     renderArchive('monthly-list', d.months, m => m, () => 'Sector rotation wrap', m => `openTextModal('/api/monthly/${m}','wrap','${m} — Sector Wrap')`);
-    if (d.months && d.months.length) {
-      const r2 = await fetch('/api/monthly/' + d.months[0]);
-      const m  = await r2.json();
-      if (m.us_sectors)     renderHeatmap('monthly-heatmap-us',     m.us_sectors,     'US Sectors (30d)');
-      if (m.idx_sectors)    renderHeatmap('monthly-heatmap-idx',    m.idx_sectors,    'IDX Sectors (30d)');
-      if (m.crypto_sectors) renderHeatmap('monthly-heatmap-crypto', m.crypto_sectors, 'Crypto Categories (30d)');
-    }
   }
 
   async function runMonthly() {
@@ -1174,6 +1157,7 @@
   loadLive();
   loadMovers();
   loadSectors();
+  loadMonthlyList();
   startPriceStream();
   setInterval(loadStatus, 15000);
   setInterval(loadMarketStatus, 60000);

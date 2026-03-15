@@ -11,7 +11,7 @@ from pathlib import Path
 import pytz
 
 WIB      = pytz.timezone("Asia/Jakarta")
-MODEL    = "claude-opus-4-6"
+MODEL    = "gemini-2.5-flash"
 HIST_DIR = Path(__file__).parent / "history" / "quarterly"
 
 
@@ -56,28 +56,23 @@ def run_quarterly_thesis() -> dict:
 
 
 def generate_quarterly_thesis(data: dict) -> str:
-    key = os.environ.get("ANTHROPIC_API_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if key:
         try:
-            return _claude_thesis(data, key)
+            return _gemini_thesis(data, key)
         except Exception as e:
-            print(f"\n⚠️  Claude error ({e.__class__.__name__}), using template.")
+            print(f"\n⚠️  Gemini error ({e.__class__.__name__}), using template.")
     return _template_thesis(data)
 
 
-# ── Claude ─────────────────────────────────────────────────────────────────────
+# ── Gemini ─────────────────────────────────────────────────────────────────────
 
-def _claude_thesis(data: dict, api_key: str) -> str:
-    import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
-    with client.messages.stream(
-        model=MODEL,
-        max_tokens=4096,
-        thinking={"type": "adaptive"},
-        messages=[{"role": "user", "content": _build_prompt(data)}],
-    ) as stream:
-        msg = stream.get_final_message()
-    return "\n".join(b.text for b in msg.content if b.type == "text")
+def _gemini_thesis(data: dict, api_key: str) -> str:
+    import google.generativeai as genai
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(MODEL)
+    response = model.generate_content(_build_prompt(data))
+    return response.text
 
 
 def _build_prompt(data: dict) -> str:

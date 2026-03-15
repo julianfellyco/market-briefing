@@ -67,7 +67,7 @@ def status():
         "has_briefing":  _state["last_briefing"] is not None,
         "briefing":      _state["last_briefing"],
         "telegram_ok":   bool(os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID")),
-        "claude_ok":     bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "gemini_ok":     bool(os.environ.get("GEMINI_API_KEY")),
     })
 
 
@@ -439,7 +439,7 @@ def get_history_date(date: str):
 @app.route("/api/settings", methods=["GET"])
 def get_settings():
     return jsonify({
-        "claude_key":    "set" if os.environ.get("ANTHROPIC_API_KEY") else "",
+        "gemini_key":    "set" if os.environ.get("GEMINI_API_KEY") else "",
         "bot_token":     "set" if os.environ.get("TELEGRAM_BOT_TOKEN") else "",
         "chat_id":       os.environ.get("TELEGRAM_CHAT_ID", ""),
         "briefing_hour": os.environ.get("BRIEFING_HOUR", "7"),
@@ -476,7 +476,7 @@ def health():
         "last_run":     _state["last_run"],
         "last_error":   _state["last_error"],
         "cache_age_s":  cache_age,
-        "claude_ok":    bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "gemini_ok":    bool(os.environ.get("GEMINI_API_KEY")),
         "telegram_ok":  bool(os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID")),
     })
 
@@ -522,7 +522,7 @@ def save_settings():
         return jsonify({"error": "Unauthorized"}), 401
     body = request.json or {}
     mapping = {
-        "claude_key":    "ANTHROPIC_API_KEY",
+        "gemini_key":    "GEMINI_API_KEY",
         "bot_token":     "TELEGRAM_BOT_TOKEN",
         "chat_id":       "TELEGRAM_CHAT_ID",
         "briefing_hour": "BRIEFING_HOUR",

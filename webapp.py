@@ -91,6 +91,7 @@ def run_now():
             from sources.forex import get_forex
             from sources.commodities import get_commodities
             from sources.fear_greed import get_crypto_fear_greed, get_stock_fear_greed
+            from sources.sectors import get_monthly_snapshot
             from delivery import send_photo
             from charts import generate_chart
             from history import save_briefing
@@ -99,17 +100,18 @@ def run_now():
             from sources.utils import safe_fetch
 
             _fetch_jobs = {
-                "us_indices":        (get_us_indices,       {},                              "📊 US indices"),
-                "ihsg":              (get_ihsg,              {},                              "🇮🇩 IHSG"),
-                "idx_movers":        (get_idx_movers,        {"gainers":[],"losers":[]},      "📈 IDX movers"),
-                "crypto_prices":     (get_crypto_prices,     {},                              "₿ Crypto prices"),
-                "global_mc":         (get_global_market_cap, {},                              "₿ Global market cap"),
-                "top_crypto_movers": (get_top_movers,        {},                              "₿ Crypto movers"),
-                "news":              (fetch_news,            {},                              "📰 News"),
-                "forex":             (get_forex,             {},                              "💱 Forex"),
-                "commodities":       (get_commodities,       {},                              "🥇 Commodities"),
-                "crypto_fear_greed": (get_crypto_fear_greed, {},                             "😱 Crypto F&G"),
-                "stock_fear_greed":  (get_stock_fear_greed,  {},                             "😱 Stock F&G"),
+                "us_indices":        (get_us_indices,        {},                              "📊 US indices"),
+                "ihsg":              (get_ihsg,               {},                              "🇮🇩 IHSG"),
+                "idx_movers":        (get_idx_movers,         {"gainers":[],"losers":[]},      "📈 IDX movers"),
+                "crypto_prices":     (get_crypto_prices,      {},                              "₿ Crypto prices"),
+                "global_mc":         (get_global_market_cap,  {},                              "₿ Global market cap"),
+                "top_crypto_movers": (get_top_movers,         {},                              "₿ Crypto movers"),
+                "news":              (fetch_news,             {},                              "📰 News"),
+                "forex":             (get_forex,              {},                              "💱 Forex"),
+                "commodities":       (get_commodities,        {},                              "🥇 Commodities"),
+                "crypto_fear_greed": (get_crypto_fear_greed,  {},                             "😱 Crypto F&G"),
+                "stock_fear_greed":  (get_stock_fear_greed,   {},                             "😱 Stock F&G"),
+                "monthly_snapshot":  (get_monthly_snapshot,   {},                             "📅 Monthly returns"),
             }
 
             _log("step", "🔄 Fetching all market data in parallel...")

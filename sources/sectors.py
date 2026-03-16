@@ -112,6 +112,34 @@ def get_crypto_sectors(period: str = "1mo") -> dict:
     return dict(sorted(result.items(), key=lambda x: x[1]["return_pct"], reverse=True))
 
 
+MONTHLY_ASSETS = {
+    "S&P 500":   "^GSPC",
+    "NASDAQ":    "^IXIC",
+    "Dow Jones": "^DJI",
+    "IHSG":      "^JKSE",
+    "Bitcoin":   "BTC-USD",
+    "Ethereum":  "ETH-USD",
+    "Gold":      "GC=F",
+    "WTI Oil":   "CL=F",
+    "Nat Gas":   "NG=F",
+    "Copper":    "HG=F",
+    "USD/IDR":   "USDIDR=X",
+    "USD Index": "DX-Y.NYB",
+    "US 10Y":    "^TNX",
+}
+
+
+def get_monthly_snapshot() -> dict:
+    """1-month returns for key assets — used to add monthly context to the daily briefing."""
+    pcts = _fetch_parallel(MONTHLY_ASSETS, "1mo")
+    result = {}
+    for name, ticker in MONTHLY_ASSETS.items():
+        pct = pcts.get(ticker)
+        if pct is not None:
+            result[name] = {"ticker": ticker, "return_pct": pct}
+    return result
+
+
 def get_macro_trends(period: str = "3mo") -> dict:
     """Key macro assets for quarterly thesis — 3-month returns."""
     ASSETS = {

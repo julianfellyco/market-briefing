@@ -54,8 +54,9 @@ def _build_prompt(data: dict) -> str:
         "4. 💱 Forex — USD/IDR and other major pairs vs IDR",
         "5. 🥇 Commodities — Gold, Oil, key commodity prices",
         "6. 😱 Market Sentiment — Crypto Fear & Greed + Stock/VIX-based Fear & Greed",
-        "7. 📰 Macro & Social Buzz — key macro events, trending topics",
-        "8. 💡 Outlook & Summary — sentiment (🟢/🔴/🟡), 3 things to watch, key risk, 3-sentence summary",
+        "7. 📅 Monthly Performance — 30-day returns for key assets; note the strongest and weakest, connect to macro themes",
+        "8. 📰 Macro & Social Buzz — key macro events, trending topics",
+        "9. 💡 Outlook & Summary — sentiment (🟢/🔴/🟡), 3 things to watch, key risk, 3-sentence summary",
         "",
         "Format with bullet points. Include all numbers. Be specific.",
     ]
@@ -240,6 +241,14 @@ def _format_data_lines(data: dict) -> list:
             lines.append(f"• {cfg['emoji']} Crypto F&G: {cfg['value']}/100 — {cfg['classification']} ({direction}{abs(chg)})")
         if sfg.get("score") is not None:
             lines.append(f"• {sfg['emoji']} Stock F&G (VIX {sfg['vix']}): {sfg['score']}/100 — {sfg['classification']}")
+
+    # Monthly snapshot
+    monthly = data.get("monthly_snapshot", {})
+    if monthly:
+        lines += ["", "━━━━━━━━━━━━━━━━━━━━━━━━", "📅 MONTHLY PERFORMANCE (30-DAY RETURNS)", "━━━━━━━━━━━━━━━━━━━━━━━━"]
+        for name, d in monthly.items():
+            arrow = "📈" if d["return_pct"] >= 0 else "📉"
+            lines.append(f"• {arrow} {name}: {d['return_pct']:+.2f}%")
 
     # Macro news
     macro_news = news.get("Macro", [])

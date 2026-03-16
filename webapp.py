@@ -13,6 +13,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
+import schedule
+
 import pytz
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request, stream_with_context
@@ -71,114 +73,114 @@ def status():
     })
 
 
+def _run_briefing():
+    """Core briefing logic — called by the scheduler and by /api/run."""
+    if _state["running"]:
+        return
+    _state["running"] = True
+    _state["last_error"] = None
+    _log("start", "")
+
+    try:
+        from sources.stocks import get_us_indices, get_ihsg, get_idx_movers
+        from sources.crypto import get_crypto_prices, get_global_market_cap, get_top_movers
+        from sources.news import fetch_news
+        from summarizer import generate_briefing
+        from delivery import send_telegram
+
+        from sources.forex import get_forex
+        from sources.commodities import get_commodities
+        from sources.fear_greed import get_crypto_fear_greed, get_stock_fear_greed
+        from sources.sectors import get_monthly_snapshot, get_us_sectors, get_idx_sectors
+        from delivery import send_photo
+        from charts import generate_chart
+        from history import save_briefing
+        from sources.utils import safe_fetch
+
+        _fetch_jobs = {
+            "us_indices":        (get_us_indices,        {},                              "📊 US indices"),
+            "ihsg":              (get_ihsg,               {},                              "🇮🇩 IHSG"),
+            "idx_movers":        (get_idx_movers,         {"gainers":[],"losers":[]},      "📈 IDX movers"),
+            "crypto_prices":     (get_crypto_prices,      {},                              "₿ Crypto prices"),
+            "global_mc":         (get_global_market_cap,  {},                              "₿ Global market cap"),
+            "top_crypto_movers": (get_top_movers,         {},                              "₿ Crypto movers"),
+            "news":              (fetch_news,             {},                              "📰 News"),
+            "forex":             (get_forex,              {},                              "💱 Forex"),
+            "commodities":       (get_commodities,        {},                              "🥇 Commodities"),
+            "crypto_fear_greed": (get_crypto_fear_greed,  {},                             "😱 Crypto F&G"),
+            "stock_fear_greed":  (get_stock_fear_greed,   {},                             "😱 Stock F&G"),
+            "monthly_snapshot":  (get_monthly_snapshot,   {},                             "📅 Monthly returns"),
+            "us_sectors":        (get_us_sectors,          {},                             "📊 US sectors"),
+            "idx_sectors":       (get_idx_sectors,         {},                             "🇮🇩 IDX sectors"),
+        }
+
+        _log("step", "🔄 Fetching all market data in parallel...")
+        data = {}
+        failed_sources = []
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futures = {
+                ex.submit(safe_fetch, fn, default=default, label=label): key
+                for key, (fn, default, label) in _fetch_jobs.items()
+            }
+            for future in as_completed(futures):
+                key = futures[future]
+                result = future.result()
+                data[key] = result
+                fn, default, label = _fetch_jobs[key]
+                if result == default:
+                    failed_sources.append(label)
+
+        if failed_sources:
+            _log("step", f"⚠️ Unavailable: {', '.join(failed_sources)}")
+        else:
+            _log("step", "✓ All sources fetched")
+
+        _log("step", "🤖 Generating briefing with Gemini...")
+        briefing = generate_briefing(data)
+        _state["last_briefing"] = briefing
+        _state["last_run"] = datetime.now(WIB).strftime("%A, %b %d — %H:%M WIB")
+
+        try:
+            save_briefing(briefing, data)
+        except Exception:
+            pass
+
+        _log("briefing", briefing)
+
+        bot  = os.environ.get("TELEGRAM_BOT_TOKEN")
+        chat = os.environ.get("TELEGRAM_CHAT_ID")
+        if bot and chat:
+            try:
+                chart_bytes = generate_chart()
+                now_wib = datetime.now(WIB)
+                send_photo(chart_bytes, f"📊 Market Chart — {now_wib.strftime('%d %b %Y, %H:%M WIB')}", bot, chat)
+                _log("step", "📊 Chart sent to Telegram.")
+            except Exception as e:
+                _log("step", f"⚠️ Chart failed: {e}")
+
+            now_wib = datetime.now(WIB)
+            header = (
+                f"🌅 *Market Morning Briefing*\n"
+                f"_{now_wib.strftime('%A, %B %d, %Y — %H:%M WIB')}_\n\n"
+            )
+            ok = send_telegram(header + briefing, bot, chat)
+            _log("step", "✅ Sent to Telegram!" if ok else "❌ Telegram delivery failed.")
+        else:
+            _log("step", "ℹ️ Telegram not configured.")
+
+    except Exception as e:
+        _state["last_error"] = str(e)
+        _log("error", str(e))
+    finally:
+        _state["running"] = False
+        _log("done", "")
+
+
 @app.route("/api/run", methods=["POST"])
 def run_now():
     if _state["running"]:
         return jsonify({"error": "Already running"}), 409
-
-    def _run():
-        _state["running"] = True
-        _state["last_error"] = None
-        _log("start", "")
-
-        try:
-            from sources.stocks import get_us_indices, get_ihsg, get_idx_movers
-            from sources.crypto import get_crypto_prices, get_global_market_cap, get_top_movers
-            from sources.news import fetch_news
-            from summarizer import generate_briefing
-            from delivery import send_telegram
-
-            from sources.forex import get_forex
-            from sources.commodities import get_commodities
-            from sources.fear_greed import get_crypto_fear_greed, get_stock_fear_greed
-            from sources.sectors import get_monthly_snapshot, get_us_sectors, get_idx_sectors
-            from delivery import send_photo
-            from charts import generate_chart
-            from history import save_briefing
-
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-            from sources.utils import safe_fetch
-
-            _fetch_jobs = {
-                "us_indices":        (get_us_indices,        {},                              "📊 US indices"),
-                "ihsg":              (get_ihsg,               {},                              "🇮🇩 IHSG"),
-                "idx_movers":        (get_idx_movers,         {"gainers":[],"losers":[]},      "📈 IDX movers"),
-                "crypto_prices":     (get_crypto_prices,      {},                              "₿ Crypto prices"),
-                "global_mc":         (get_global_market_cap,  {},                              "₿ Global market cap"),
-                "top_crypto_movers": (get_top_movers,         {},                              "₿ Crypto movers"),
-                "news":              (fetch_news,             {},                              "📰 News"),
-                "forex":             (get_forex,              {},                              "💱 Forex"),
-                "commodities":       (get_commodities,        {},                              "🥇 Commodities"),
-                "crypto_fear_greed": (get_crypto_fear_greed,  {},                             "😱 Crypto F&G"),
-                "stock_fear_greed":  (get_stock_fear_greed,   {},                             "😱 Stock F&G"),
-                "monthly_snapshot":  (get_monthly_snapshot,   {},                             "📅 Monthly returns"),
-                "us_sectors":        (get_us_sectors,          {},                             "📊 US sectors"),
-                "idx_sectors":       (get_idx_sectors,         {},                             "🇮🇩 IDX sectors"),
-            }
-
-            _log("step", "🔄 Fetching all market data in parallel...")
-            data = {}
-            failed_sources = []
-            with ThreadPoolExecutor(max_workers=8) as ex:
-                futures = {
-                    ex.submit(safe_fetch, fn, default=default, label=label): key
-                    for key, (fn, default, label) in _fetch_jobs.items()
-                }
-                for future in as_completed(futures):
-                    key = futures[future]
-                    result = future.result()
-                    data[key] = result
-                    fn, default, label = _fetch_jobs[key]
-                    if result == default:
-                        failed_sources.append(label)
-
-            if failed_sources:
-                _log("step", f"⚠️ Unavailable: {', '.join(failed_sources)}")
-            else:
-                _log("step", "✓ All sources fetched")
-
-            _log("step", "🤖 Generating briefing with Claude...")
-            briefing = generate_briefing(data)
-            _state["last_briefing"] = briefing
-            _state["last_run"] = datetime.now(WIB).strftime("%A, %b %d — %H:%M WIB")
-
-            try:
-                save_briefing(briefing, data)
-            except Exception:
-                pass
-
-            _log("briefing", briefing)
-
-            bot   = os.environ.get("TELEGRAM_BOT_TOKEN")
-            chat  = os.environ.get("TELEGRAM_CHAT_ID")
-            if bot and chat:
-                # Send chart first
-                try:
-                    chart_bytes = generate_chart()
-                    now_wib = datetime.now(WIB)
-                    send_photo(chart_bytes, f"📊 Market Chart — {now_wib.strftime('%d %b %Y, %H:%M WIB')}", bot, chat)
-                    _log("step", "📊 Chart sent to Telegram.")
-                except Exception as e:
-                    _log("step", f"⚠️ Chart failed: {e}")
-
-                now_wib = datetime.now(WIB)
-                header = (
-                    f"🌅 *Market Morning Briefing*\n"
-                    f"_{now_wib.strftime('%A, %B %d, %Y — %H:%M WIB')}_\n\n"
-                )
-                ok = send_telegram(header + briefing, bot, chat)
-                _log("step", "✅ Sent to Telegram!" if ok else "❌ Telegram delivery failed.")
-            else:
-                _log("step", "ℹ️ Telegram not configured.")
-
-        except Exception as e:
-            _state["last_error"] = str(e)
-            _log("error", str(e))
-        finally:
-            _state["running"] = False
-            _log("done", "")
-
-    threading.Thread(target=_run, daemon=True).start()
+    threading.Thread(target=_run_briefing, daemon=True).start()
     return jsonify({"ok": True})
 
 
@@ -538,6 +540,7 @@ def save_settings():
             _write_env(env_key, val)
             os.environ[env_key] = val
     load_dotenv(override=True)
+    _start_scheduler()   # reschedule if hour/min changed
     return jsonify({"ok": True})
 
 
@@ -599,9 +602,31 @@ def _write_env(key: str, value: str):
     env_path.write_text("\n".join(lines) + "\n")
 
 
+# ── Scheduler ─────────────────────────────────────────────────────────────────
+
+def _start_scheduler():
+    """(Re)schedule the daily briefing at the configured WIB time."""
+    hour     = int(os.environ.get("BRIEFING_HOUR",   "7"))
+    minute   = int(os.environ.get("BRIEFING_MINUTE", "0"))
+    time_str = f"{hour:02d}:{minute:02d}"
+    schedule.clear("briefing")
+    schedule.every().day.at(time_str, "Asia/Jakarta").tag("briefing").do(
+        lambda: threading.Thread(target=_run_briefing, daemon=True).start()
+    )
+    log.info(f"📅 Briefing scheduled daily at {time_str} WIB")
+
+
+def _scheduler_loop():
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("🌅  Market Briefing Web App")
     print("    Open: http://localhost:8080")
+    _start_scheduler()
+    threading.Thread(target=_scheduler_loop, daemon=True).start()
     app.run(debug=False, port=8080, threaded=True)

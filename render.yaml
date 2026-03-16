@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: market-briefing
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn webapp:app --workers=1 --worker-class=gthread --threads=8 --timeout=0 --bind=0.0.0.0:$PORT
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: BRIEFING_HOUR
+        value: 7
+      - key: BRIEFING_MINUTE
+        value: 0

@@ -15,8 +15,9 @@ venv/
 # Logs
 logs/
 
-# History data (generated at runtime)
-history/
+# History data (generated at runtime — keep placeholder dir)
+history/*.json
+history/*.txt
 
 # Charts / temp files
 *.png

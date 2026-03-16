@@ -1,5 +1,6 @@
 # Web framework
 flask>=3.0.0
+gunicorn>=21.2.0
 
 # Market data
 yfinance>=0.2.40

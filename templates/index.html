@@ -423,6 +423,139 @@
     #toast.success { border-color:var(--up);   color:var(--up); }
     #toast.error   { border-color:var(--down); color:var(--down); }
 
+    /* ── Analyze tab ── */
+    .analyze-search {
+      display:flex; gap:10px; margin-bottom:20px;
+    }
+    .analyze-input {
+      flex:1; padding:12px 16px;
+      background:var(--faint); border:1px solid var(--line);
+      border-radius:var(--r); color:var(--ink);
+      font-size:15px; font-family:inherit; outline:none;
+      transition:border-color .2s;
+    }
+    .analyze-input:focus { border-color:var(--gold); }
+    .analyze-btn {
+      height:46px; padding:0 22px;
+      background:var(--gold); color:#000;
+      border:none; border-radius:var(--r);
+      font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+      cursor:pointer; transition:opacity .15s, transform .1s;
+      white-space:nowrap;
+    }
+    .analyze-btn:hover   { opacity:.88; }
+    .analyze-btn:active  { transform:scale(.97); }
+    .analyze-btn:disabled { opacity:.35; cursor:not-allowed; transform:none; }
+    .analyze-chips {
+      display:flex; flex-wrap:wrap; gap:7px; margin-bottom:36px;
+    }
+    .chip {
+      padding:5px 12px; border-radius:20px;
+      background:var(--faint); border:1px solid var(--line);
+      font-size:11.5px; font-weight:600; color:var(--dim);
+      cursor:pointer; transition:all .15s; letter-spacing:.02em;
+    }
+    .chip:hover { color:var(--ink); border-color:var(--gold); }
+    #analyze-result { animation: fadeUp .3s ease both; }
+    .analysis-card {
+      background:var(--faint); border:1px solid var(--line);
+      border-radius:14px; overflow:hidden; margin-bottom:24px;
+    }
+    .analysis-card-head {
+      padding:20px 24px; border-bottom:1px solid var(--line);
+      display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+    }
+    .analysis-asset { font-size:20px; font-weight:700; letter-spacing:-.02em; }
+    .analysis-ts    { font-size:11px; color:var(--dim); }
+    .sentiment-badge {
+      padding:5px 14px; border-radius:20px;
+      font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    }
+    .sentiment-badge.bullish { background:#052e16; color:var(--up); border:1px solid #166534; }
+    .sentiment-badge.bearish { background:#2d0a0a; color:var(--down); border:1px solid #7f1d1d; }
+    .sentiment-badge.neutral { background:#1c1400; color:var(--amber); border:1px solid #854d0e; }
+    .analysis-metrics {
+      display:grid; grid-template-columns:1fr 1fr 1fr 1fr;
+      border-bottom:1px solid var(--line);
+    }
+    .analysis-metric {
+      padding:16px 24px; border-right:1px solid var(--line);
+    }
+    .analysis-metric:last-child { border-right:none; }
+    .analysis-metric-label { font-size:10px; font-weight:600; color:var(--dim); letter-spacing:.07em; text-transform:uppercase; margin-bottom:4px; }
+    .analysis-metric-value { font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; }
+    .confidence-bar-wrap { margin-top:6px; height:3px; background:var(--line); border-radius:2px; }
+    .confidence-bar { height:100%; border-radius:2px; transition:width .6s ease; }
+    .analysis-body { padding:24px; }
+    .analysis-factors {
+      display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px;
+    }
+    .factor-box { }
+    .factor-box-head {
+      font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+      margin-bottom:12px; display:flex; align-items:center; gap:7px;
+    }
+    .factor-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+    .factor-list { list-style:none; display:flex; flex-direction:column; gap:8px; }
+    .factor-list li {
+      font-size:12.5px; line-height:1.55; color:var(--dim);
+      padding-left:14px; position:relative;
+    }
+    .factor-list li::before {
+      content:''; position:absolute; left:0; top:7px;
+      width:4px; height:4px; border-radius:50%;
+    }
+    .factor-list.bull li::before { background:var(--up); }
+    .factor-list.bear li::before { background:var(--down); }
+    .analysis-levels {
+      display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px;
+    }
+    .level-box-head {
+      font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+      color:var(--dim); margin-bottom:10px;
+    }
+    .level-row {
+      display:flex; align-items:baseline; justify-content:space-between;
+      padding:8px 0; border-bottom:1px solid var(--line);
+      gap:10px;
+    }
+    .level-row:last-child { border-bottom:none; }
+    .level-price { font-size:13.5px; font-weight:600; font-variant-numeric:tabular-nums; }
+    .level-note  { font-size:11px; color:var(--dim); text-align:right; flex:1; }
+    .analysis-outlook {
+      display:grid; grid-template-columns:1fr 1fr; gap:20px;
+    }
+    .outlook-box {
+      background:var(--bg); border:1px solid var(--line);
+      border-radius:10px; padding:16px 18px;
+    }
+    .outlook-label {
+      font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+      color:var(--dim); margin-bottom:8px;
+    }
+    .outlook-text { font-size:12.5px; line-height:1.65; color:var(--ink); }
+    .analyze-loading {
+      text-align:center; padding:60px 0;
+      font-size:13px; color:var(--dim);
+    }
+    .analyze-loading-dot {
+      display:inline-block; width:8px; height:8px; border-radius:50%;
+      background:var(--gold); margin:0 3px;
+      animation: bounce 1.2s ease-in-out infinite;
+    }
+    .analyze-loading-dot:nth-child(2) { animation-delay:.2s; }
+    .analyze-loading-dot:nth-child(3) { animation-delay:.4s; }
+    @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+    #analyze-error { color:var(--down); font-size:13px; padding:24px 0; }
+
+    @media (max-width:700px) {
+      .analysis-metrics { grid-template-columns:1fr 1fr; }
+      .analysis-metric:nth-child(2) { border-right:none; }
+      .analysis-factors, .analysis-levels, .analysis-outlook { grid-template-columns:1fr; }
+      .analyze-search { flex-direction:column; }
+      .analyze-btn { height:44px; }
+    }
+
     ::-webkit-scrollbar { width:4px; }
     ::-webkit-scrollbar-track { background:transparent; }
     ::-webkit-scrollbar-thumb { background:var(--faint); border-radius:2px; }
@@ -480,6 +613,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('markets')">Markets</button>
     <button class="tab-btn" onclick="switchTab('latest')">Daily</button>
+    <button class="tab-btn" onclick="switchTab('analyze')">Analyze</button>
     <button class="tab-btn" onclick="switchTab('monthly')">Monthly</button>
     <button class="tab-btn" onclick="switchTab('quarterly')">Quarterly</button>
     <button class="tab-btn" onclick="switchTab('history')">Archive</button>
@@ -563,7 +697,6 @@
       <div id="sectors-loading"></div>
       <div id="sectors-us"></div>
       <div id="sectors-idx"></div>
-      <div id="sectors-crypto"></div>
     </div>
 
   </div>
@@ -572,6 +705,30 @@
   <div id="tab-latest" class="tab-panel">
     <div id="briefing-ts"></div>
     <div id="briefing-content"><span class="placeholder">Hit Run Now to generate today's market briefing.</span></div>
+  </div>
+
+  <!-- ══ Analyze tab ══ -->
+  <div id="tab-analyze" class="tab-panel">
+    <div class="analyze-search">
+      <input class="analyze-input" id="analyze-input" type="text"
+        placeholder="Enter asset: BTC, IHSG, Gold, AAPL, ETH, SPX…"
+        onkeydown="if(event.key==='Enter') runAnalysis()"
+      />
+      <button class="analyze-btn" id="analyze-btn" onclick="runAnalysis()">Analyze</button>
+    </div>
+    <div class="analyze-chips">
+      <span class="chip" onclick="analyzeAsset('BTC')">₿ BTC</span>
+      <span class="chip" onclick="analyzeAsset('ETH')">Ξ ETH</span>
+      <span class="chip" onclick="analyzeAsset('SOL')">◎ SOL</span>
+      <span class="chip" onclick="analyzeAsset('IHSG')">🇮🇩 IHSG</span>
+      <span class="chip" onclick="analyzeAsset('Gold')">🥇 Gold</span>
+      <span class="chip" onclick="analyzeAsset('Oil')">🛢 Oil</span>
+      <span class="chip" onclick="analyzeAsset('SPX')">📊 S&amp;P 500</span>
+      <span class="chip" onclick="analyzeAsset('NASDAQ')">📊 NASDAQ</span>
+      <span class="chip" onclick="analyzeAsset('USD/IDR')">💱 USD/IDR</span>
+      <span class="chip" onclick="analyzeAsset('VIX')">😱 VIX</span>
+    </div>
+    <div id="analyze-result"></div>
   </div>
 
   <!-- ══ Monthly tab ══ -->
@@ -914,7 +1071,7 @@
   }
 
   // ── Tabs ─────────────────────────────────────────────────────────────────────
-  const TAB_NAMES = ['markets','latest','monthly','quarterly','history'];
+  const TAB_NAMES = ['markets','latest','analyze','monthly','quarterly','history'];
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', TAB_NAMES[i] === name));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -923,6 +1080,151 @@
     if (name === 'monthly')   loadMonthlyList();
     if (name === 'history')   loadHistory();
     if (name === 'quarterly') loadQuarterlyList();
+    if (name === 'analyze')   document.getElementById('analyze-input').focus();
+  }
+
+  // ── Analyze ───────────────────────────────────────────────────────────────────
+  function analyzeAsset(asset) {
+    document.getElementById('analyze-input').value = asset;
+    runAnalysis();
+  }
+
+  async function runAnalysis() {
+    const input = document.getElementById('analyze-input');
+    const btn   = document.getElementById('analyze-btn');
+    const out   = document.getElementById('analyze-result');
+    const asset = input.value.trim();
+    if (!asset) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Analyzing…';
+    out.innerHTML = `<div class="analyze-loading">
+      <span class="analyze-loading-dot"></span>
+      <span class="analyze-loading-dot"></span>
+      <span class="analyze-loading-dot"></span>
+      <div style="margin-top:14px;font-size:12px">Fetching market data &amp; running AI analysis…</div>
+    </div>`;
+
+    try {
+      const res  = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({asset})
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      renderAnalysis(data, out);
+    } catch(e) {
+      out.innerHTML = `<p id="analyze-error">❌ ${e.message}</p>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Analyze';
+    }
+  }
+
+  function renderAnalysis(d, out) {
+    const a  = d.analysis || {};
+    const m  = d.market   || {};
+    const s  = (a.sentiment || 'Neutral').toLowerCase();
+    const sentClass = s === 'bullish' ? 'bullish' : s === 'bearish' ? 'bearish' : 'neutral';
+    const sentEmoji = s === 'bullish' ? '🟢' : s === 'bearish' ? '🔴' : '🟡';
+    const conf  = typeof a.confidence === 'number' ? a.confidence : 0;
+    const barColor = s === 'bullish' ? 'var(--up)' : s === 'bearish' ? 'var(--down)' : 'var(--amber)';
+
+    const metricCls = (v) => v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
+    const fmtPct    = (v) => v != null ? `<span class="${metricCls(v)}">${v > 0 ? '+' : ''}${v.toFixed(2)}%</span>` : '<span class="flat">—</span>';
+    const fmtPrice  = (v) => v != null ? v.toLocaleString(undefined, {maximumSignificantDigits:6}) : '—';
+
+    const bullFactors = (a.bullish_factors || []).map(f => `<li>${f}</li>`).join('') || '<li>No bullish factors identified</li>';
+    const bearFactors = (a.bearish_factors || []).map(f => `<li>${f}</li>`).join('') || '<li>No bearish factors identified</li>';
+
+    const levels = (arr, cls) => (arr || []).map(l =>
+      `<div class="level-row">
+        <span class="level-price ${cls}">${l.level}</span>
+        <span class="level-note">${l.note || ''}</span>
+      </div>`
+    ).join('') || '<div class="level-row"><span class="level-price flat">—</span></div>';
+
+    out.innerHTML = `
+    <div class="analysis-card">
+      <div class="analysis-card-head">
+        <div>
+          <div class="analysis-asset">${d.asset}</div>
+          <div class="analysis-ts">${d.ticker} · ${d.timestamp}</div>
+        </div>
+        <span class="sentiment-badge ${sentClass}">${sentEmoji} ${a.sentiment || 'Neutral'}</span>
+      </div>
+
+      <div class="analysis-metrics">
+        <div class="analysis-metric">
+          <div class="analysis-metric-label">Price</div>
+          <div class="analysis-metric-value">${fmtPrice(m.price)}</div>
+        </div>
+        <div class="analysis-metric">
+          <div class="analysis-metric-label">24h</div>
+          <div class="analysis-metric-value">${fmtPct(m.chg_1d)}</div>
+        </div>
+        <div class="analysis-metric">
+          <div class="analysis-metric-label">7D</div>
+          <div class="analysis-metric-value">${fmtPct(m.chg_7d)}</div>
+        </div>
+        <div class="analysis-metric">
+          <div class="analysis-metric-label">30D</div>
+          <div class="analysis-metric-value">${fmtPct(m.chg_1mo)}</div>
+        </div>
+      </div>
+
+      <div style="padding:16px 24px; border-bottom:1px solid var(--line);">
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span style="font-size:10.5px;font-weight:600;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;">AI Confidence</span>
+          <span style="font-size:12px;font-weight:700;color:${barColor}">${conf}%</span>
+        </div>
+        <div class="confidence-bar-wrap">
+          <div class="confidence-bar" style="width:${conf}%;background:${barColor}"></div>
+        </div>
+      </div>
+
+      <div class="analysis-body">
+        <div class="analysis-factors">
+          <div class="factor-box">
+            <div class="factor-box-head">
+              <div class="factor-dot" style="background:var(--up)"></div>
+              Bullish Factors
+            </div>
+            <ul class="factor-list bull">${bullFactors}</ul>
+          </div>
+          <div class="factor-box">
+            <div class="factor-box-head">
+              <div class="factor-dot" style="background:var(--down)"></div>
+              Bearish Factors
+            </div>
+            <ul class="factor-list bear">${bearFactors}</ul>
+          </div>
+        </div>
+
+        <div class="analysis-levels">
+          <div>
+            <div class="level-box-head">Support Levels</div>
+            ${levels(a.support_levels, 'up')}
+          </div>
+          <div>
+            <div class="level-box-head">Resistance Levels</div>
+            ${levels(a.resistance_levels, 'down')}
+          </div>
+        </div>
+
+        <div class="analysis-outlook">
+          <div class="outlook-box">
+            <div class="outlook-label">📅 Short-term (7 days)</div>
+            <div class="outlook-text">${a.short_term || '—'}</div>
+          </div>
+          <div class="outlook-box">
+            <div class="outlook-label">🎯 Long-term (6 months)</div>
+            <div class="outlook-text">${a.long_term || '—'}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
   }
 
   // ── SSE helper ────────────────────────────────────────────────────────────────
@@ -1043,7 +1345,7 @@
     if (period) _sectorPeriod = period;
     const loading = document.getElementById('sectors-loading');
     loading.textContent = 'Loading sector data…';
-    ['sectors-us','sectors-idx','sectors-crypto'].forEach(id => document.getElementById(id).innerHTML = '');
+    ['sectors-us','sectors-idx'].forEach(id => document.getElementById(id).innerHTML = '');
     try {
       const res = await fetch('/api/sectors?p=' + _sectorPeriod);
       if (!res.ok) throw new Error('fetch failed');
@@ -1051,9 +1353,8 @@
       loading.textContent = '';
       const lblMap = {'5d':'1W','1mo':'1M','3mo':'3M'};
       const lbl = lblMap[_sectorPeriod] || _sectorPeriod;
-      if (d.us)     renderHeatmap('sectors-us',     d.us,     `US Sectors (${lbl})`);
-      if (d.idx)    renderHeatmap('sectors-idx',    d.idx,    `IDX Sectors (${lbl})`);
-      if (d.crypto) renderHeatmap('sectors-crypto', d.crypto, `Crypto Categories (${lbl})`);
+      if (d.us)  renderHeatmap('sectors-us',  d.us,  `US Sectors (${lbl})`);
+      if (d.idx) renderHeatmap('sectors-idx', d.idx, `IDX Sectors (${lbl})`);
     } catch(e) {
       loading.textContent = 'Could not load sector data.';
     }

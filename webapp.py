@@ -493,6 +493,187 @@ def market_status():
     return jsonify(get_market_status())
 
 
+_TICKER_MAP = {
+    # Crypto
+    "BTC": "BTC-USD", "BITCOIN": "BTC-USD",
+    "ETH": "ETH-USD", "ETHEREUM": "ETH-USD",
+    "SOL": "SOL-USD", "SOLANA": "SOL-USD",
+    "BNB": "BNB-USD", "XRP": "XRP-USD",
+    "DOGE": "DOGE-USD", "ADA": "ADA-USD",
+    "AVAX": "AVAX-USD", "DOT": "DOT-USD",
+    "LINK": "LINK-USD", "UNI": "UNI-USD",
+    "MATIC": "MATIC-USD", "ARB": "ARB-USD",
+    # Indices
+    "SPX": "^GSPC", "SP500": "^GSPC", "S&P": "^GSPC", "S&P500": "^GSPC",
+    "NASDAQ": "^IXIC", "NDX": "^IXIC", "COMP": "^IXIC",
+    "DJI": "^DJI", "DOW": "^DJI", "DJIA": "^DJI",
+    "IHSG": "^JKSE", "IDX": "^JKSE", "JKSE": "^JKSE",
+    "NIKKEI": "^N225", "N225": "^N225",
+    "HSI": "^HSI", "HANGSENG": "^HSI",
+    "VIX": "^VIX",
+    # Commodities
+    "GOLD": "GC=F", "XAU": "GC=F",
+    "SILVER": "SI=F", "XAG": "SI=F",
+    "OIL": "CL=F", "WTI": "CL=F", "CRUDE": "CL=F",
+    "BRENT": "BZ=F", "NATGAS": "NG=F", "GAS": "NG=F",
+    "COPPER": "HG=F",
+    # Forex
+    "USDIDR": "USDIDR=X", "USD/IDR": "USDIDR=X",
+    "EURUSD": "EURUSD=X", "EUR/USD": "EURUSD=X",
+    "GBPUSD": "GBPUSD=X", "GBP/USD": "GBPUSD=X",
+    "DXY": "DX-Y.NYB", "USDINDEX": "DX-Y.NYB",
+}
+
+_analysis_cache: dict = {}
+_ANALYSIS_TTL = 300  # 5 min per asset
+
+
+def _resolve_ticker(asset: str):
+    """Return (ticker, display_name) for a given asset string."""
+    key = asset.upper().replace(" ", "").replace("-", "")
+    if key in _TICKER_MAP:
+        return _TICKER_MAP[key], asset.upper()
+    # Check original with spaces/dashes
+    if asset.upper() in _TICKER_MAP:
+        return _TICKER_MAP[asset.upper()], asset.upper()
+    return asset.upper(), asset.upper()  # pass through as-is
+
+
+def _fetch_analysis_data(ticker: str) -> dict:
+    import yfinance as yf
+    try:
+        t = yf.Ticker(ticker)
+        hist_1y = t.history(period="1y")
+        hist_1mo = t.history(period="1mo")
+        hist_7d  = t.history(period="5d")
+        if hist_1y.empty:
+            return {}
+
+        price    = float(hist_1y["Close"].iloc[-1])
+        high_52w = float(hist_1y["High"].max())
+        low_52w  = float(hist_1y["Low"].min())
+
+        def pct(old, new):
+            return round((new - old) / old * 100, 2) if old else None
+
+        chg_1d  = pct(float(hist_1y["Close"].iloc[-2]), price) if len(hist_1y) >= 2 else None
+        chg_7d  = pct(float(hist_7d["Close"].iloc[0]),  price) if len(hist_7d) >= 2 else None
+        chg_1mo = pct(float(hist_1mo["Close"].iloc[0]), price) if len(hist_1mo) >= 2 else None
+        chg_ytd = pct(float(hist_1y["Close"].iloc[0]),  price)
+
+        vol = float(hist_1y["Volume"].iloc[-1]) if "Volume" in hist_1y.columns else None
+        vol_avg = float(hist_1y["Volume"].mean()) if "Volume" in hist_1y.columns else None
+
+        return {
+            "price":    round(price, 4),
+            "high_52w": round(high_52w, 4),
+            "low_52w":  round(low_52w, 4),
+            "chg_1d":   chg_1d,
+            "chg_7d":   chg_7d,
+            "chg_1mo":  chg_1mo,
+            "chg_ytd":  chg_ytd,
+            "vol":      vol,
+            "vol_avg":  vol_avg,
+        }
+    except Exception as e:
+        log.warning(f"analysis data fetch failed for {ticker}: {e}")
+        return {}
+
+
+@app.route("/api/analyze", methods=["POST"])
+def analyze_asset():
+    body  = request.json or {}
+    asset = body.get("asset", "").strip()
+    if not asset:
+        return jsonify({"error": "Asset required"}), 400
+
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key:
+        return jsonify({"error": "Gemini API key not configured"}), 503
+
+    ticker, display = _resolve_ticker(asset)
+
+    # Cache check
+    now = time.time()
+    cached = _analysis_cache.get(ticker)
+    if cached and now - cached["ts"] < _ANALYSIS_TTL:
+        return jsonify(cached["data"])
+
+    mkt = _fetch_analysis_data(ticker)
+
+    # Build market context string
+    def fmt(v, pct=False):
+        if v is None: return "N/A"
+        return f"{v:+.2f}%" if pct else f"{v:,.4g}"
+
+    ctx_lines = [
+        f"Asset: {display} ({ticker})",
+        f"Current Price: {fmt(mkt.get('price'))}",
+        f"1D Change: {fmt(mkt.get('chg_1d'), True)}",
+        f"7D Change: {fmt(mkt.get('chg_7d'), True)}",
+        f"1M Change: {fmt(mkt.get('chg_1mo'), True)}",
+        f"YTD Change: {fmt(mkt.get('chg_ytd'), True)}",
+        f"52W High: {fmt(mkt.get('high_52w'))}",
+        f"52W Low: {fmt(mkt.get('low_52w'))}",
+    ]
+    if mkt.get("vol") and mkt.get("vol_avg"):
+        vol_ratio = mkt["vol"] / mkt["vol_avg"]
+        ctx_lines.append(f"Volume vs Avg: {vol_ratio:.2f}x ({'above' if vol_ratio > 1 else 'below'} average)")
+
+    ctx = "\n".join(ctx_lines)
+
+    prompt = f"""You are a professional hedge fund market analyst.
+
+Analyze the following asset using price action, news sentiment, macro factors, whale activity, and social media narrative.
+
+=== LIVE MARKET DATA ===
+{ctx}
+=== END DATA ===
+
+Return your analysis as a JSON object with exactly this structure:
+{{
+  "sentiment": "Bullish" | "Bearish" | "Neutral",
+  "confidence": <integer 0-100>,
+  "bullish_factors": ["factor 1", "factor 2", "factor 3", ...],
+  "bearish_factors": ["factor 1", "factor 2", ...],
+  "support_levels": [{{"level": "price or zone", "note": "why it matters"}}, ...],
+  "resistance_levels": [{{"level": "price or zone", "note": "why it matters"}}, ...],
+  "short_term": "7-day outlook in 2-3 sentences with specific price targets or ranges",
+  "long_term": "6-month outlook in 2-3 sentences with macro context"
+}}
+
+Be specific with numbers. Use actual price levels, not vague descriptions. Return only valid JSON, no markdown fences.
+"""
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=key)
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        resp  = model.generate_content(prompt)
+        raw   = resp.text.strip()
+        # Strip markdown fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        result = {"raw": raw}
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    now_wib = datetime.now(WIB)
+    out = {
+        "asset":     display,
+        "ticker":    ticker,
+        "market":    mkt,
+        "analysis":  result,
+        "timestamp": now_wib.strftime("%d %b %Y, %H:%M WIB"),
+    }
+    _analysis_cache[ticker] = {"data": out, "ts": time.time()}
+    return jsonify(out)
+
+
 @app.route("/api/sectors")
 def get_sectors():
     """Sector performance for US, IDX, and Crypto — cached 5 min per period."""
@@ -622,11 +803,16 @@ def _scheduler_loop():
         time.sleep(30)
 
 
+# ── Startup (runs on import — works with gunicorn and direct run) ──────────────
+
+_start_scheduler()
+threading.Thread(target=_scheduler_loop, daemon=True).start()
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
     print("🌅  Market Briefing Web App")
-    print("    Open: http://localhost:8080")
-    _start_scheduler()
-    threading.Thread(target=_scheduler_loop, daemon=True).start()
-    app.run(debug=False, port=8080, threaded=True)
+    print(f"    Open: http://localhost:{port}")
+    app.run(debug=False, host="0.0.0.0", port=port, threaded=True)

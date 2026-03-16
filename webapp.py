@@ -91,7 +91,7 @@ def run_now():
             from sources.forex import get_forex
             from sources.commodities import get_commodities
             from sources.fear_greed import get_crypto_fear_greed, get_stock_fear_greed
-            from sources.sectors import get_monthly_snapshot
+            from sources.sectors import get_monthly_snapshot, get_us_sectors, get_idx_sectors
             from delivery import send_photo
             from charts import generate_chart
             from history import save_briefing
@@ -112,6 +112,8 @@ def run_now():
                 "crypto_fear_greed": (get_crypto_fear_greed,  {},                             "😱 Crypto F&G"),
                 "stock_fear_greed":  (get_stock_fear_greed,   {},                             "😱 Stock F&G"),
                 "monthly_snapshot":  (get_monthly_snapshot,   {},                             "📅 Monthly returns"),
+                "us_sectors":        (get_us_sectors,          {},                             "📊 US sectors"),
+                "idx_sectors":       (get_idx_sectors,         {},                             "🇮🇩 IDX sectors"),
             }
 
             _log("step", "🔄 Fetching all market data in parallel...")

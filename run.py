@@ -34,7 +34,7 @@ from sources.news import fetch_news
 from sources.forex import get_forex
 from sources.commodities import get_commodities
 from sources.fear_greed import get_crypto_fear_greed, get_stock_fear_greed
-from sources.sectors import get_monthly_snapshot
+from sources.sectors import get_monthly_snapshot, get_us_sectors, get_idx_sectors
 from sources.utils import safe_fetch, get_logger
 from summarizer import generate_briefing
 from delivery import get_chat_id, send_telegram, send_photo
@@ -73,6 +73,8 @@ def run_briefing() -> None:
         "crypto_fear_greed": (get_crypto_fear_greed, {},                             "crypto F&G"),
         "stock_fear_greed":  (get_stock_fear_greed,  {},                             "stock F&G"),
         "monthly_snapshot":  (get_monthly_snapshot,  {},                             "monthly returns"),
+        "us_sectors":        (get_us_sectors,         {},                             "US sectors"),
+        "idx_sectors":       (get_idx_sectors,        {},                             "IDX sectors"),
     }
     data = {}
     failed = []

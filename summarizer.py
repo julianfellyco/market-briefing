@@ -55,8 +55,10 @@ def _build_prompt(data: dict) -> str:
         "5. 🥇 Commodities — Gold, Oil, key commodity prices",
         "6. 😱 Market Sentiment — Crypto Fear & Greed + Stock/VIX-based Fear & Greed",
         "7. 📅 Monthly Performance — 30-day returns for key assets; note the strongest and weakest, connect to macro themes",
-        "8. 📰 Macro & Social Buzz — key macro events, trending topics",
-        "9. 💡 Outlook & Summary — sentiment (🟢/🔴/🟡), 3 things to watch, key risk, 3-sentence summary",
+        "8. 🏦 US Sector Wrap — top 3 and bottom 3 sectors (30d), rotation signal, what it means for the market",
+        "9. 🇮🇩 IDX Sector Wrap — top 3 and bottom 3 IDX sectors (30d), connect to local macro (BI rate, commodities, IDR)",
+        "10. 📰 Macro & Social Buzz — key macro events, trending topics",
+        "11. 💡 Outlook & Summary — sentiment (🟢/🔴/🟡), 3 things to watch, key risk, 3-sentence summary",
         "",
         "Format with bullet points. Include all numbers. Be specific.",
     ]
@@ -247,6 +249,22 @@ def _format_data_lines(data: dict) -> list:
     if monthly:
         lines += ["", "━━━━━━━━━━━━━━━━━━━━━━━━", "📅 MONTHLY PERFORMANCE (30-DAY RETURNS)", "━━━━━━━━━━━━━━━━━━━━━━━━"]
         for name, d in monthly.items():
+            arrow = "📈" if d["return_pct"] >= 0 else "📉"
+            lines.append(f"• {arrow} {name}: {d['return_pct']:+.2f}%")
+
+    # US sector performance
+    us_sectors = data.get("us_sectors", {})
+    if us_sectors:
+        lines += ["", "━━━━━━━━━━━━━━━━━━━━━━━━", "🏦 US SECTOR PERFORMANCE (30D)", "━━━━━━━━━━━━━━━━━━━━━━━━"]
+        for name, d in us_sectors.items():
+            arrow = "📈" if d["return_pct"] >= 0 else "📉"
+            lines.append(f"• {arrow} {name}: {d['return_pct']:+.2f}%")
+
+    # IDX sector performance
+    idx_sectors = data.get("idx_sectors", {})
+    if idx_sectors:
+        lines += ["", "━━━━━━━━━━━━━━━━━━━━━━━━", "🇮🇩 IDX SECTOR PERFORMANCE (30D)", "━━━━━━━━━━━━━━━━━━━━━━━━"]
+        for name, d in idx_sectors.items():
             arrow = "📈" if d["return_pct"] >= 0 else "📉"
             lines.append(f"• {arrow} {name}: {d['return_pct']:+.2f}%")
 
